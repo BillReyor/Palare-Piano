@@ -184,8 +184,11 @@ things a choir is always told:
   to stagger your breathing.
 
 On the track with your part left out, it shows you when to come in. Each track has its own singer,
-and they are not all alike: young and older, every skin tone, some in glasses, some with a thick
-chain or with plugs in their ears, and each happy in their own way. If you would rather not see
+and they are not all alike: young and older, every skin tone, thin and fat, tall and short, some
+in glasses, some bearded, some made up, some with a thick chain or with plugs in their ears, one
+with a hearing aid, one in a wheelchair. Some wear a collar in the colours of their flag (the
+rainbow, trans, bi and others) and some a plain white one. Each is happy in their own way. If
+you would rather not see
 them, untick **Show the little singer** under your pieces.
 
 **Your director's breaths.** Where you have been told to breathe, or not to, mark it: open **Fix a

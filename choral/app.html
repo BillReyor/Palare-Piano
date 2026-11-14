@@ -320,7 +320,8 @@ function singerPart(file, p, sing) {
 // computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
 // shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
 const SINGER_LOOK = `precision highp float;
-uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2;      // uWho: older, chain (1 a steel chain, 2 with a padlock on it), ear (1 plug, 2 tunnel), which way of being happy (0 to 4); uWho2: glasses, hair (1 on top, 2 grey at the sides)
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2, uWho3; uniform vec3 uShade, uBeard, uFlag[7];      // uWho3: how wide, how tall, the stripes of the collar's flag, and freckles + 2 x a hearing aid + 4 x a wheelchair; uWho2.zw: a beard (2: a moustache), make-up;
+// uWho: older, chain (1 a steel chain, 2 with a padlock on it), ear (1 plug, 2 tunnel), which way of being happy (0 to 4); uWho2: glasses, hair (1 on top, 2 grey at the sides)
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
@@ -354,20 +355,35 @@ float padlock(vec3 p) {                              // ... and on some, a padlo
 }
 float glasses(vec3 h) { vec3 q = vec3(abs(h.x) - .19, h.y - .075, h.z - .487);
   return min(length(vec2(length(q.xy) - .108, q.z)) - .013, max(length(vec2(h.y - .09, h.z - .505)) - .011, abs(h.x) - .085)); }
-float hair(vec3 h) { float cap = ellipsoid(h, vec3(.578, .538, .548));
-  return uWho2.y > 1.5 ? max(cap, max(max(h.y - .21, -(h.y + .13)), h.z - .17)) : max(cap, -(h.y - .085 - .45 * h.z)); }      // grey at the sides and back - or a head of it
-vec2 scene(vec3 p) {                                 // -> (distance to the nearest surface, which thing it is)
-  float robe = max(roundCone(p - vec3(0., -.98, 0.), .60 + uBreath * .012, .33 + uIn * .045, .98), -(p.y + .98));      // (it stands on the floor)
+float hair(vec3 h) {                                 // 1 short, 2 grey at the sides and back, 3 an afro, 4 long, 5 a bun, 6 a mohawk
+  float st = uWho2.y, cap = ellipsoid(h, vec3(.578, .538, .548)), line = -(h.y - .085 - .45 * h.z);
+  if (st < 1.5) return max(cap, line);
+  if (st < 2.5) return max(cap, max(max(h.y - .21, -(h.y + .13)), h.z - .17));
+  if (st < 3.5) return max(ellipsoid(h - vec3(0., .13, -.03), vec3(.74, .66, .68)) - .022 * sin(h.x * 21.) * sin(h.y * 21.) * sin(h.z * 21.), -(h.y - .15 - .5 * h.z));      // (its curls)
+  if (st < 4.5) return min(max(cap, line), max(max(length(h.xz * vec2(1., 1.04)) - .60, max(h.y - .15, -(h.y + .64))), h.z - .10));
+  if (st < 5.5) return min(max(cap, line), length(h - vec3(0., .57, -.12)) - .17);
+  return ellipsoid(h - vec3(0., .50, -.05), vec3(.06, .27, .46)) - .02 * abs(sin(h.z * 16.));      // (its spikes)
+}
+float aid(vec3 h) { return ellipsoid(vec3(h.x - .592, h.y - .075, h.z + .035), vec3(.03, .065, .042)); }      // a hearing aid, behind one ear
+float wheels(vec3 p) {                               // a wheelchair: its two wheels, the rings a hand pushes, the small wheels in front
+  float x = abs(p.x) - (.60 * uWho3.x * uWho3.y + .11), r = length(vec2(p.y + .55, p.z + .08));
+  vec3 c = vec3(abs(p.x) - .30, p.y + .905, p.z - .52);
+  return min(min(length(vec2(r - .43, x)) - .04, length(vec2(r - .34, x - .065)) - .014), min(length(vec3(x, p.y + .55, p.z + .08)) - .06, length(vec2(length(c.yz) - .07, c.x)) - .025));
+}
+vec3 body(vec3 p) { return (p - vec3(0., -.98, 0.)) / uWho3.y + vec3(0., -.98, 0.); }      // taller or shorter, from the floor up
+vec2 scene0(vec3 p) {                                // -> (distance to the nearest surface, which thing it is), for somebody of middling height
+  float W = uWho3.x;                                 // thin or fat
+  float robe = max(roundCone(p - vec3(0., -.98, 0.), .60 * W + uBreath * .012, (.33 + uIn * .045) * (.55 + .45 * W), .98), -(p.y + .98));      // (it stands on the floor)
   vec3 h = inHead(p);
-  float head = smin(ellipsoid(h, vec3(.55, .51, .52)), ellipsoid(h - vec3(0., -.20 - .12 * uJaw, .05), vec3(.37, .30, .39)), .12);      // ... with a chin that drops
+  float head = smin(ellipsoid(h, vec3(.55 * (1. + .12 * (W - 1.)), .51, .52)), ellipsoid(h - vec3(0., -.20 - .12 * uJaw, .05), vec3(.37 * (1. + .35 * (W - 1.)), .30, .39)), .12);      // ... with a chin that drops
   if (mouthSize().y > .012) head = max(head, -ellipsoid(h - mouthAt(), mouthSize()));        // the mouth is hollowed out of it
   head = smin(head, lips(h), .012);
   float ear = ears(h); if (uWho.z > 1.5) { vec2 lq = lobe(h); ear = max(ear, -max(lq.x - .038, abs(lq.y) - .08)); }
   head = smin(head, ear, .02);
   float collar = length(vec2(length(p.xz) - .30 - uIn * .03, p.y - .08 - lift())) - .085;
   vec3 a = vec3(abs(p.x), p.y, p.z);
-  float hands = length(a - vec3(.37, -.36 + uBounce * .012 + lift() * .6, .50)) - .105;
-  vec3 f = p - vec3(0., -.40 + uBounce * .012 + lift() * .6, .53); float c = cos(.55), s = sin(.55); f = vec3(f.x, c * f.y - s * f.z, s * f.y + c * f.z);
+  float hands = length(a - vec3(.37 + .07 * (W - 1.), -.36 + uBounce * .012 + lift() * .6, .50 + .15 * (W - 1.))) - .105;
+  vec3 f = p - vec3(0., -.40 + uBounce * .012 + lift() * .6, .53 + .15 * (W - 1.)); float c = cos(.55), s = sin(.55); f = vec3(f.x, c * f.y - s * f.z, s * f.y + c * f.z);
   float folder = box(f, vec3(.33, .21, .012), .012);
   vec2 d = vec2(robe, 1.);
   if (head < d.x) d = vec2(head, 2.);
@@ -379,12 +395,14 @@ vec2 scene(vec3 p) {                                 // -> (distance to the near
   if (uWho.z > .5) { float x = plug(h); if (x < d.x) d = vec2(x, 7.); }
   if (uWho2.x > .5) { float x = glasses(h); if (x < d.x) d = vec2(x, 8.); }
   if (uWho2.y > .5) { float x = hair(h); if (x < d.x) d = vec2(x, 9.); }
+  if (mod(uWho3.w, 4.) > 1.5) { float x = aid(h); if (x < d.x) d = vec2(x, 12.); }
   return d;
 }
+vec2 scene(vec3 p) { vec2 d = scene0(body(p)); d.x *= uWho3.y; if (uWho3.w > 3.5) { float x = wheels(p); if (x < d.x) d = vec2(x, 11.); } return d; }
 vec3 normalAt(vec3 p) { vec2 e = vec2(.002, 0.); return normalize(vec3(scene(p + e.xyy).x - scene(p - e.xyy).x, scene(p + e.yxy).x - scene(p - e.yxy).x, scene(p + e.yyx).x - scene(p - e.yyx).x)); }
 vec4 shade(vec2 px) {
   vec2 uv = (px - .5 * uRes) / uRes.y / mix(1., 2.0, uZoom);                 // close up: the face fills the picture
-  vec3 ro = vec3(0., mix(.08, .50, uZoom), 5.3), rd = normalize(vec3(uv.x, uv.y, -2.05));
+  vec3 ro = vec3(0., mix(.08, -.98 + 1.48 * uWho3.y, uZoom), 5.3), rd = normalize(vec3(uv.x, uv.y, -2.05));
   float t = 3.6, hit = 0.; vec2 d;
   for (int i = 0; i < 56; i++) { d = scene(ro + rd * t); if (d.x < .0012) { hit = 1.; break; } t += d.x; if (t > 8.2) break; }
   if (hit < .5) {                                    // nothing there: only the figure's shadow on the floor
@@ -392,8 +410,9 @@ vec4 shade(vec2 px) {
     float sh = rd.y < 0. ? smoothstep(.95, .15, length(vec2(g.x, g.z * .8))) * .22 : 0.;
     return vec4(0., 0., 0., sh);
   }
-  vec3 p = ro + rd * t, n = normalAt(p), h = inHead(p), col;
+  vec3 pw = ro + rd * t, n = normalAt(pw), p = body(pw), h = inHead(p), col;
   vec3 skin = uSkin, robe = uTint; float fair = dot(uSkin, vec3(.2126, .7152, .0722));      // the singer's own skin, and how light it is
+  float made = uWho2.w;                              // made up: eye shadow, lashes, lipstick
   if (d.y < 1.5) col = robe * (.82 + .18 * smoothstep(-.9, .1, p.y));
   else if (d.y < 2.5) {
     col = skin;
@@ -405,7 +424,7 @@ vec4 shade(vec2 px) {
       float upper = smoothstep(1. - 1.1 * uTeeth - .08, 1. - 1.1 * uTeeth + .08, q.y / ms.y);                              // the upper teeth, as far as they show
       col = mix(col, vec3(.97, .96, .93), upper * step(.01, uTeeth) * smoothstep(.95, .75, abs(q.x) / ms.x));
     }
-    else if (lips(h) < .006) col = mix(skin, vec3(.74, .30, .32), mix(.50, .42, fair));
+    else if (lips(h) < .006) col = mix(mix(skin, vec3(.74, .30, .32), mix(.50, .42, fair)), vec3(.85, .08, .30), made * .9);
     else if (h.z > 0.) {
       float old = uWho.x, mood = uWho.w, ex = abs(h.x) - .19;      // everybody is happy, each in their own way: a small smile (0),
       float beam = step(abs(mood - 1.), .5), wow = step(abs(mood - 2.), .5), cheeky = step(abs(mood - 3.), .5), calm = step(abs(mood - 4.), .5);      // a beam, delight, a cheeky one, contentment
@@ -427,26 +446,46 @@ vec4 shade(vec2 px) {
       float shut = 1. - smoothstep(.012, .03, ms.y);                                       // a small smile while the mouth is shut
       float wide = .09 + .045 * beam + .012 * wow + .012 * cheeky - .018 * calm;           // ... each smile its own: broad, deep, lopsided, or slight
       float curve = -.195 - .045 * beam + (2.2 + 1.4 * beam + 1.3 * wow - .5 * calm) * h.x * h.x + .15 * cheeky * h.x;
-      vec3 ink = mix(uSkin * .32, vec3(.42, .20, .22), fair);
+      vec3 ink = mix(mix(uSkin * .32, vec3(.42, .20, .22), fair), vec3(.80, .07, .28), made);
+      if (mod(uWho3.w, 2.) > .5) {                                                           // freckles, over the nose and cheeks
+        vec2 cell = floor(h.xy * 34.); float r1 = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453), r2 = fract(sin(dot(cell, vec2(39.346, 11.135))) * 24634.6345);
+        vec2 in_ = fract(h.xy * 34.) - .5 - (vec2(r2, fract(r1 * 7.3)) - .5) * .6;                // scattered, not ruled
+        col = mix(col, col * .62, step(.45, r1) * smoothstep(.20 + .1 * r2, .08, length(in_)) * smoothstep(.15, .07, abs(h.y + .035 - .25 * abs(h.x))) * smoothstep(.40, .28, abs(h.x)));
+      }
+      if (made > .5) {                                                                       // eye shadow up to the brow, and a wing at the corner
+        col = mix(col, uShade, .8 * smoothstep(1.0, 1.2, eye) * smoothstep(1.95, 1.6, length(e / vec2(.078, .1))) * step(-.01, e.y) * (1. - shutEye));
+        col = mix(col, vec3(.07, .05, .09), smoothstep(.014, .006, abs(e.y - .012 - .75 * (e.x - .045))) * step(.045, e.x) * step(e.x, .10));
+      }
+      if (uWho2.z > .5) {                                                                    // a moustache; and with it, on some, a beard along the jaw and under the mouth
+        vec3 hc = uBeard;
+        float tache = smoothstep(.026, .012, abs(h.y + .118 + 1.5 * h.x * h.x)) * smoothstep(.16, .13, abs(h.x));
+        float beard = step(uWho2.z, 1.5) * smoothstep(.012, -.012, h.y + .07 + .21 * smoothstep(.27, .09, abs(h.x)));
+        col = mix(col, hc * (.85 + .3 * fract(sin(dot(floor(h.xy * 90.), vec2(7.1, 3.3))) * 91.7)), max(tache, beard) * .95);
+      }
       float top = -.183 + .5 * h.x * h.x, within = smoothstep(wide + .012, wide - .008, abs(h.x));
       float grin = beam * smoothstep(-.006, .006, h.y - curve) * smoothstep(.006, -.006, h.y - top) * within;      // a beam shows its teeth
       col = mix(col, vec3(.98, .97, .94), shut * grin);
-      col = mix(col, ink, shut * max(smoothstep(.019, .010, abs(h.y - curve)), beam * smoothstep(.013, .007, abs(h.y - top))) * within);
+      col = mix(col, ink, shut * max(smoothstep(.019 + .008 * made, .010 + .006 * made, abs(h.y - curve)), beam * smoothstep(.013, .007, abs(h.y - top))) * within);
     }
   }
-  else if (d.y < 3.5) col = vec3(.98);
+  else if (d.y < 3.5) {                              // the collar: white, or the stripes of a flag from the top down
+    col = vec3(.98);
+    if (uWho3.z > .5) { float k = floor(clamp((.08 + lift() + .085 - p.y) / .17, 0., .999) * uWho3.z); for (int i = 0; i < 7; i++) if (float(i) == k) col = uFlag[i]; }
+  }
   else if (d.y < 4.5) col = skin;
   else if (d.y < 5.5) col = vec3(.16, .14, .22);
   else if (d.y < 6.5) col = vec3(.70, .72, .77);                                              // the chain: steel
   else if (d.y < 7.5) col = uWho.z > 1.5 ? vec3(.62, .64, .68) : vec3(.07, .07, .09);        // a steel tunnel, a black plug
   else if (d.y < 8.5) col = vec3(.10, .09, .12);                                              // glasses
   else if (d.y < 9.5) col = uHair;
-  else col = vec3(.30, .31, .35);                                                             // the padlock: darker than its chain
+  else if (d.y < 10.5) col = vec3(.30, .31, .35);                                                             // the padlock: darker than its chain
+  else if (d.y < 11.5) col = vec3(.15, .15, .18);                                             // a wheelchair's wheels
+  else col = vec3(.10, .70, .66);                                                             // a hearing aid, in a colour of its own
   vec3 l = normalize(vec3(-.45, .8, .65));
   float dif = pow(.5 + .5 * dot(n, l), 1.6), ao = 1.;
   for (int i = 1; i <= 4; i++) { float s = .06 * float(i); ao -= (s - scene(p + n * s).x) * .9 / float(i); }
   float rim = pow(1. - max(dot(n, -rd), 0.), 3.);
-  float shine = (d.y > 5.5 && d.y < 7.5) || d.y > 9.5 ? .75 : .10;                                           // metal catches the light
+  float shine = (d.y > 5.5 && d.y < 7.5) || (d.y > 9.5 && d.y < 10.5) ? .75 : d.y > 10.5 ? .35 : .10;                                           // metal catches the light
   vec3 lit = col * (.38 + .74 * dif) * clamp(ao, .45, 1.) + rim * .22 + pow(max(dot(reflect(rd, n), l), 0.), 28.) * shine;      // (the light on its edge keeps a dark head clear of a dark page)
   return vec4(pow(clamp(lit, 0., 1.), vec3(.92)), 1.);
 }
@@ -470,24 +509,34 @@ function singerTone(pid, index) { let h = 0; for (const ch of String(pid)) h = (
 // A chorus is not made of one person.  Besides a skin tone, each track's singer is somebody: older (grey at the temples,
 // bushy brows, lines on the forehead) or not; with a punk's thick steel chain (a padlock on some), or without; with plugs or tunnels
 // in stretched ear lobes, or neither; in glasses or not; bald, or with hair - dyed, as likely as not, on the one
-// with the plugs.  And everybody is happy, each in their own way (mood): a small smile, a beam that shows its teeth and
+// with the plugs; thin or fat, short or tall; bearded, moustached, made up, freckled; with a hearing aid; in a wheelchair;
+// in a collar of their flag's colours or a white one.  And everybody is happy, each in their own way (mood): a small smile, a beam that shows its teeth and
 // lifts the cheeks, brows up in delight, a cheeky lopsided one with a cocked brow, eyes shut in contentment.  Each trait takes its own turn round
 // the tracks of a piece, so that among any five of them there is some of everybody and no two are alike.
 const HAIRS = [[.12, .09, .08], [.32, .2, .12], [.62, .44, .2], [.5, .2, .1], [.95, .35, .62], [.25, .55, .92], [.3, .75, .5]];
+// Nobody's identity shows on their body, so it is worn, by those who wear it: a collar in the colours of a flag (the
+// others' collars are white).  Each: its name, and its stripes from the top.
+const FLAGS = [['none', []], ['rainbow', [[.89, .01, .01], [1, .55, 0], [1, .93, 0], [0, .5, .15], [0, .3, 1], [.46, .03, .53]]], ['trans', [[.36, .81, .98], [.96, .66, .72], [1, 1, 1], [.96, .66, .72], [.36, .81, .98]]], ['bi', [[.84, .01, .44], [.84, .01, .44], [.61, .31, .59], [0, .22, .66], [0, .22, .66]]], ['pan', [[1, .13, .55], [1, .85, 0], [.13, .69, 1]]], ['nonbinary', [[.99, .96, .2], [1, 1, 1], [.61, .35, .82], [.17, .17, .17]]], ['ace', [[.1, .1, .1], [.64, .64, .64], [1, 1, 1], [.5, 0, .5]]], ['lesbian', [[.84, .18, 0], [.99, .6, .34], [1, 1, 1], [.83, .38, .64], [.64, .01, .38]]], ['bear', [[.38, .22, .02], [.84, .39, 0], [.99, .87, .39], [1, .9, .72], [1, 1, 1], [.33, .33, .33], [.1, .1, .1]]]];
 function singerLook(pid, index) {
   let h = 0; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const i = Math.max(0, index), turn = (shift, n) => (((h >>> shift) % n) + i) % n, kind = shift => 1 + ((i >> 2) + (h >>> shift)) % 2;
-  const old = [1, 3].includes(turn(0, 5)), plug = turn(8, 4) === 1 ? kind(9) : 0, punk = !!plug && !old;
-  const hair = old ? (turn(11, 3) === 0 ? 0 : 2) : punk || turn(13, 3) !== 0 ? 1 : 0;
+  const g = Math.imul(h ^ 0x9e3779b9, 2654435761) >>> 0, i = Math.max(0, index);
+  const turn = (shift, n) => (((h >>> shift) % n) + i) % n, more = (shift, n) => (((g >>> shift) % n) + i) % n, kind = shift => 1 + ((i >> 2) + (h >>> shift)) % 2;
+  const old = [1, 3].includes(turn(0, 5)), plug = turn(8, 4) === 1 ? kind(9) : 0, punk = !!plug && !old, chair = more(0, 7) === 3 ? 1 : 0;
+  // hair: 0 none, 1 short, 2 grey at the sides, 3 an afro, 4 long, 5 a bun, 6 a mohawk
+  const hair = old ? [0, 2, 2, 4, 2][turn(11, 5)] : punk ? 6 : [1, 3, 0, 4, 5, 1, 0][turn(13, 7)];
   return { tone: singerTone(pid, index), old: old ? 1 : 0, chain: turn(5, 4) === 0 ? kind(7) : 0, plug, mood: turn(3, 5),
     specs: (old ? turn(15, 2) === 0 : turn(17, 5) === 0) ? 1 : 0, hair,
-    hairCol: old ? (turn(19, 2) ? [.84, .84, .86] : [.95, .95, .95]) : HAIRS[punk ? 4 + ((h >>> 4) + i) % 3 : ((h >>> 4) + i) % 4] };
+    hairCol: old ? (turn(19, 2) ? [.84, .84, .86] : [.95, .95, .95]) : HAIRS[punk ? 4 + ((h >>> 4) + i) % 3 : ((h >>> 4) + i) % 4],
+    wide: [1, .8, 1, 1.27, 1.13][more(3, 5)], tall: chair ? .86 : [1, .9, 1.07, 1][more(6, 4)],      // thin and fat, short and tall
+    flag: more(9, 2) === 0 ? 1 + ((g >>> 11) + (i >> 1) * 3) % 8 : 0,                              // the colours worn, by those who wear them
+    beard: [1, 0, 0, 2, 0][more(13, 5)], beardCol: old ? [.86, .86, .87] : HAIRS[((h >>> 4) + i) % 4], makeup: more(16, 6) === 1 ? 1 : 0, shade: [[.2, .75, .8], [.7, .35, .9], [.95, .4, .6]][(g >>> 24) % 3],      // a beard or a moustache; eye shadow and lipstick
+    freckles: more(19, 5) === 4 ? 1 : 0, aid: more(22, 8) === 5 ? 1 : 0, chair };                   // freckles; a hearing aid; a wheelchair
 }
 const singer = {
   on: (() => { try { return localStorage.getItem('palare-singer') !== '0'; } catch (e) { return true; } })(),
   still: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
   s: { open: 0, wide: .45, tall: 0, round: 0, jaw: 0, teeth: 0, tongue: 0, blink: 0, bounce: 0, sway: 0, breath: 0, inn: 0, zoom: 0, lively: 0 },
-  tint: [.42, .18, .63], skin: TONES[3], who: { old: 0, chain: 0, plug: 0, mood: 0, specs: 0, hair: 0, hairCol: [.1, .1, .1] }, running: false, big: false,
+  tint: [.42, .18, .63], skin: TONES[3], who: { old: 0, chain: 0, plug: 0, mood: 0, specs: 0, hair: 0, hairCol: [.1, .1, .1], wide: 1, tall: 1, flag: 0, beard: 0, makeup: 0, shade: [.5, .5, .5], beardCol: [.2, .14, .1], freckles: 0, aid: 0, chair: 0 }, running: false, big: false,
   make() {                                           // once: the picture, and the lines that draw it
     if (this.canvas !== undefined) return this.gl;
     const c = this.canvas = document.createElement('canvas');
@@ -504,7 +553,7 @@ const singer = {
       if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
       gl.useProgram(pr); gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0); gl.bindAttribLocation(pr, 0, 'p'); gl.vertexAttribPointer(gl.getAttribLocation(pr, 'p'), 2, gl.FLOAT, false, 0, 0);
-      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uRound', 'uJaw', 'uTeeth', 'uTongue', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uIn', 'uZoom', 'uTint', 'uSkin', 'uHair', 'uWho', 'uWho2'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
+      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uRound', 'uJaw', 'uTeeth', 'uTongue', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uIn', 'uZoom', 'uTint', 'uSkin', 'uHair', 'uWho', 'uWho2', 'uWho3', 'uShade', 'uBeard', 'uFlag'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
     } catch (e) { this.gl = null; this.why = String(e.message || e); }
     return this.gl;
   },
@@ -521,7 +570,9 @@ const singer = {
     gl.uniform1f(at.uTeeth, s.teeth); gl.uniform1f(at.uTongue, s.tongue); gl.uniform1f(at.uBlink, s.blink); gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway);
     gl.uniform1f(at.uBreath, s.breath); gl.uniform1f(at.uIn, s.inn); gl.uniform1f(at.uZoom, s.zoom);
     gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]); gl.uniform3f(at.uSkin, this.skin[0], this.skin[1], this.skin[2]);
-    const w = this.who; gl.uniform3f(at.uHair, w.hairCol[0], w.hairCol[1], w.hairCol[2]); gl.uniform4f(at.uWho, w.old, w.chain, w.plug, w.mood); gl.uniform4f(at.uWho2, w.specs, w.hair, 0, 0);
+    const w = this.who; gl.uniform3f(at.uHair, w.hairCol[0], w.hairCol[1], w.hairCol[2]); gl.uniform4f(at.uWho, w.old, w.chain, w.plug, w.mood); gl.uniform4f(at.uWho2, w.specs, w.hair, w.beard, w.makeup);
+    const stripes = FLAGS[w.flag][1], flat = new Float32Array(21); stripes.forEach((c, k) => flat.set(c, 3 * k));
+    gl.uniform4f(at.uWho3, w.wide, w.tall, stripes.length, w.freckles + 2 * w.aid + 4 * w.chair); gl.uniform3f(at.uShade, w.shade[0], w.shade[1], w.shade[2]); gl.uniform3f(at.uBeard, w.beardCol[0], w.beardCol[1], w.beardCol[2]); gl.uniform3fv(at.uFlag, flat);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   },
   step(dt, now) {                                    // one moment on: towards what the track is doing

@@ -371,3 +371,48 @@ def test_everybody_is_happy_each_in_their_own_way():
     assert 'grump' not in HTML.lower() and 'frown' not in HTML.lower()
     look = HTML[HTML.index('const SINGER_LOOK'):HTML.index('const MOUTHS')]
     assert 'mood' in look
+
+
+# ---- more of everybody: bodies, colours worn, and the rest
+# A listener: "some are fat some are skinny, some are gay, some are trans, some are straight, think of other combos
+# I haven't thought of."  Nobody's identity shows on their body, so it is worn, by those who wear it: a collar in the
+# colours of a flag.  The rest is how people simply are: wide and narrow, tall and short, bearded, made up, freckled,
+# with every kind of hair, with a hearing aid, in a wheelchair.
+def chorus(piece='My Song', n=20):
+    return [js(f'singerLook({json.dumps(piece)}, {i})', 'singerLook', 'singerTone', consts=['TONES', 'HAIRS', 'FLAGS']) for i in range(n)]
+
+
+def test_bodies_are_wide_and_narrow_tall_and_short():
+    five, twenty = chorus(n=5), chorus()
+    assert min(s['wide'] for s in five) < .9 and max(s['wide'] for s in five) > 1.2        # among any five: somebody thin, somebody fat
+    assert min(s['tall'] for s in twenty) < .95 and max(s['tall'] for s in twenty) > 1.04
+    assert sum(1 for s in twenty if .95 <= s['wide'] <= 1.05) >= 6                         # and plenty in between
+
+
+def test_some_wear_their_colours_and_some_do_not():
+    flags = js('FLAGS', consts=['FLAGS'])
+    names = [f[0] for f in flags]
+    assert names[0] == 'none' and {'rainbow', 'trans', 'bi', 'pan', 'nonbinary', 'ace', 'lesbian', 'bear'} <= set(names)
+    trans = next(f[1] for f in flags if f[0] == 'trans')
+    assert len(trans) == 5 and trans[0] == trans[4] and trans[1] == trans[3] and trans[2] == [1, 1, 1]      # blue, pink, white, pink, blue
+    assert len(next(f[1] for f in flags if f[0] == 'rainbow')) == 6
+    twenty = chorus()
+    worn = [s['flag'] for s in twenty]
+    assert 6 <= sum(1 for f in worn if f) <= 14                    # about half wear colours; the others' collars are white
+    assert len({f for f in worn if f}) >= 6 and names.index('trans') in worn and names.index('rainbow') in worn
+    assert any(s['flag'] for s in chorus(n=5)) and not all(s['flag'] for s in chorus(n=5))
+
+
+def test_and_the_rest_of_how_people_are():
+    twenty = chorus()
+    count = lambda k: sum(1 for s in twenty if s[k])
+    assert 2 <= count('beard') <= 9 and {s['beard'] for s in twenty} >= {0, 1, 2}          # a beard, a moustache, neither
+    assert 1 <= count('makeup') <= 6
+    assert 1 <= count('freckles') <= 7 and 1 <= count('aid') <= 4 and 1 <= count('chair') <= 4
+    assert len({s['hair'] for s in twenty}) >= 5                   # bald, short, grey at the sides, an afro, long, a bun, a mohawk ...
+    assert len({json.dumps(s, sort_keys=True) for s in twenty}) == 20
+    assert all(s['tall'] < 1 for s in twenty if s['chair'])        # (seated)
+
+
+def test_another_piece_is_another_chorus():
+    assert chorus('My Song', 5) != chorus('Another', 5)

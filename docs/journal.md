@@ -2106,3 +2106,17 @@ each track of a piece: a small smile; a beam that shows its teeth and lifts the 
 the eyes are arches; brows high in delight; a cheeky lopsided smile under one cocked brow; and
 eyes shut in plain contentment. The expression stays in the brows and the eyes while the mouth
 is busy singing.
+
+**Everybody.** "Some are fat some are skinny, some are gay, some are trans, some are straight,
+think of other combos I haven't thought of." The first two are bodies, and were drawn as
+bodies: the robe wide or narrow, the whole figure a little taller or shorter. The next three
+are not, and that was the thing to get right - nobody's being gay or trans or straight shows
+on them. What shows is what people choose to wear. So about half the singers have a collar in
+the stripes of a flag - the rainbow, the trans flag, bi, pan, nonbinary, ace, lesbian, the
+bears' - and the other half a plain white one, which says nothing about them either way. The
+rest of the combinations were the ordinary differences of any roomful of singers: a beard or a
+moustache (grey on the older ones, and its own colour under a dyed mohawk); eye shadow, a wing
+at the corner of the eye and lipstick, with or without a beard; freckles; an afro, long hair, a
+bun; a hearing aid behind one ear; a wheelchair. Each takes its own turn round the tracks, and
+they combine as they fall. Looked at twenty at a time, and five close up. Not drawn, and for
+the listener to say: what people wear on their heads for their faith.
