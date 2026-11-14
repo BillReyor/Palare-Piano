@@ -89,6 +89,7 @@ Real voices are added later from the page, on a Mac, by `python -m choral.setup_
 sh tools/test.sh                # every unit test: under a minute
 sh tools/test.sh -k upbeat      # only the tests with "upbeat" in their names (whatever pytest takes)
 sh tools/reread.sh              # the reader on your own sheet music: which readings changed
+sh tools/try_safari.sh          # on a Mac: the page in Safari's own engine - a track, and the fixer's notes
 ```
 
 The first runs the unit tests (`tests/`) on this computer, a Mac or Linux, in a Python it makes for
