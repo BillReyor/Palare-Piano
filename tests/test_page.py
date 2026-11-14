@@ -188,7 +188,7 @@ def test_the_mouth_is_shut_before_the_first_note_between_phrases_and_after_the_l
 
 
 def test_the_mouth_opens_quickly_on_a_note_and_is_that_vowels():
-    opened, mouth, since = mouth_at(1.5)
+    opened, mouth, since, _ = mouth_at(1.5)
     assert opened == 1 and mouth == 'a' and since == pytest.approx(.5)
     assert 0 < mouth_at(1.02)[0] < 1                    # opening: not a switch thrown
     assert mouth_at(2.5)[1] == 'e' and mouth_at(3.2)[1] == 'o'
@@ -201,7 +201,7 @@ def test_the_mouth_stays_open_from_one_note_to_the_next_and_closes_at_the_end_of
 
 
 def test_a_hum_is_sung_with_the_lips_together():
-    opened, mouth, _ = mouth_at(6)
+    opened, mouth, _, _ = mouth_at(6)
     assert opened == 0 and mouth == 'm'
 
 
@@ -260,3 +260,56 @@ def test_a_singer_keeps_its_tone_and_pieces_do_not_all_begin_alike():
     firsts = {js(f'singerTone({json.dumps(name)}, 0)', 'singerTone', consts=['TONES']) for name in ('My Song', 'Another', 'A Third One', 'Fourth', 'The Fifth Piece', 'Six')}
     assert len(firsts) >= 3
     assert js('singerTone("My Song", -1)', 'singerTone', consts=['TONES']) in range(len(tones()))       # a track it cannot place still gets one
+
+
+# ---- the mouth as a choir is taught it: the vowel held, a diphthong turned late, a consonant closed at the last moment
+def test_a_diphthong_is_its_first_vowel_and_turns_only_at_the_very_end():
+    my = [[1.0, 1.0, 'a', 'i', '', .5], [2.0, 1.0, 'u', '', '', .5]]
+    assert mouth_at(1.3, my)[1] == 'a' and mouth_at(1.8, my)[1] == 'a'      # "mah..." nearly all the way
+    assert mouth_at(1.95, my)[1] == 'i'                                     # "...ee", just before the next note
+    assert mouth_at(2.3, my)[1] == 'u'
+
+
+def test_a_last_consonant_closes_the_mouth_at_the_end_of_its_note():
+    night = [[1.0, 1.0, 'a', 'i', 't', .5]]
+    assert mouth_at(1.5, night)[1] == 'a'
+    opened, shape, _, _ = mouth_at(1.985, night)
+    assert shape == 't' and opened < .5                                     # the tongue, where the note stops
+    come = [[1.0, .5, 'a', '', 'b', .5], [1.5, .5, 'a', '', '', .5]]        # ... also when the next note follows at once
+    assert mouth_at(1.48, come)[1] == 'b' and mouth_at(1.48, come)[0] == 0  # lips together for "m"
+    assert mouth_at(1.6, come)[1] == 'a'
+
+
+def test_how_high_the_note_lies_comes_with_the_mouth():
+    assert mouth_at(1.5, [[1.0, 1.0, 'a', '', '', .9]])[3] == .9
+    assert mouth_at(1.5)[3] == .5                                           # (not said: the middle)
+
+
+# ---- when to breathe
+BREATHS = [[5.0, 'b', 1.0], [8.0, 'c', .25], [10.0, 's', 16.0], [30.0, 'b', .3]]      # [the moment to have breathed by, kind, room]
+
+
+def breath_at(t, breaths=BREATHS):
+    return js(f'breathAt({json.dumps(breaths)}, {t})', 'breathAt')
+
+
+def test_a_breath_is_taken_in_the_beat_before_an_entrance():
+    assert breath_at(3.0) == [0, None, False]                               # too early
+    filling, kind, _ = breath_at(4.55)
+    assert kind == 'b' and filling == pytest.approx(.5, abs=.02)            # half way in, with .9 s to take it
+    assert breath_at(4.99)[0] > .95 and breath_at(5.0)[0] == 0              # full - and then it is sung
+
+
+def test_a_breath_has_no_more_time_than_the_rest_gives_it():
+    assert breath_at(29.6)[0] == 0 and breath_at(29.85)[0] == pytest.approx(.5, abs=.02)
+
+
+def test_a_catch_breath_is_quick():
+    assert breath_at(7.7)[0] == 0
+    filling, kind, _ = breath_at(7.9)
+    assert kind == 'c' and .4 < filling < .8
+
+
+def test_a_long_stretch_is_one_to_stagger_the_breathing_in():
+    assert breath_at(12)[2] is True and breath_at(9.5)[2] is False and breath_at(26.5)[2] is False
+    assert breath_at(3, [])[0] == 0 and js('breathAt(null, 3)', 'breathAt') == [0, None, False]

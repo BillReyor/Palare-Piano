@@ -15,6 +15,8 @@ for name, x, least in (('Hear this measure', measure, 100), ('Hear this line', l
 singer = r.get('singer') or {}
 if singer.get('on') and not (singer.get('beside') and singer.get('notes') and singer.get('open', 0) > .3):
     wrong.append(f'the little singer did not sing beside the track: {singer}')
+if r.get('hidden'):
+    print('  (the window counted as hidden: its clocks run slow and it is given no frames)')
 if r.get('msg'):
     wrong.append('the page said: ' + r['msg'])
 print(f"  a track played {track.get('played')} s; Hear this measure: sound in {measure.get('withSound')} of {measure.get('blocks')} blocks; "

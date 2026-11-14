@@ -15,5 +15,5 @@ window.R = {}; window.LOG = [];
   if (!S.pieces.length) { await post('/api/demo'); for (let i = 0; i < 30; i++) { await wait(700); await refresh(); if (S.pieces[0] && S.pieces[0].status === 'read' && !S.job && !(S.waiting || []).length) break; } }      // (read, and the program free again)
   if (S.pieces[0].status !== 'ready') { for (let i = 0; ; i++) { try { await post('/api/render', { id: S.pieces[0].id, part: 'bass', singers: 4 }); break; } catch (e) { if (i > 10) throw e; await wait(700); } }      // (it may still be finishing the reading)
     for (let i = 0; i < 100; i++) { await wait(1000); await refresh(); if (S.pieces[0].status === 'ready' && !S.job) break; } }
-  await wait(800); R.ua = navigator.userAgent; R.status = S.pieces[0].status; out('next');
+  await wait(800); R.ua = navigator.userAgent; R.hidden = document.hidden; R.status = S.pieces[0].status; out('next');
 } catch (e) { out({ error: 's1 ' + e }); } })(); 0;

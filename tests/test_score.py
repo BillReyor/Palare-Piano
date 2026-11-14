@@ -344,3 +344,18 @@ def test_demo_score_loads(demo_score):
     # the say: line for "shenandoah"
     assert [n['phon'] for n in t1[1:4]] == ['sh EH n', 'AX n', 'd OW']
     assert len(sc.piano) == 38
+
+
+# ---- a breath marked in the music, and "no breath here"
+def test_a_breath_mark_and_a_carry_on_mark_are_kept_on_their_notes(tmp_path):
+    # a choir is told where to breathe measure by measure: "," after a note's value is a breath after that note,
+    # "&" is "no breath: carry on" - whatever the rests and the commas in the words might suggest
+    f = tmp_path / 'b.score'
+    f.write_text('title: x\ntempo: 60\ntime: 4/4\nkey: 0\n\n== 1\nTEN: c4/q,=one d4/q&=two, e4/q=three f4/q,>=four\n')
+    sc = score.load(str(f), warn=lambda *a: None)
+    flags = [n['flags'] for n in sc.parts['T1']]
+    assert ',' in flags[0] and '&' not in flags[0]
+    assert '&' in flags[1] and ',' not in flags[1]
+    assert not flags[2] & {',', '&'}
+    assert {',', '>'} <= flags[3]                              # beside any other mark
+    assert [n['lyric'] for n in sc.parts['T1']][1] == 'two,'   # (a comma in the words is still the words')

@@ -165,8 +165,18 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.45 ui-monos
 .where-in .jump { margin-left: auto; }
 .track { position: relative; }
 .track.with-singer { padding-right: 118px; min-height: 140px; }
-.track canvas.singer { position: absolute; top: 6px; right: 8px; width: 104px; height: 128px; pointer-events: none; }
-@media (max-width: 520px) { .track.with-singer { padding-right: 0; min-height: 0; } .track canvas.singer { display: none; } }
+.track .singer { position: absolute; top: 6px; right: 8px; width: 104px; text-align: center; cursor: zoom-in; }
+.track .singer canvas { display: block; width: 104px; height: 128px; }
+.track .singer.big { width: 208px; cursor: zoom-out; }
+.track .singer.big canvas { width: 208px; height: 256px; }
+.track.with-singer.big-singer { padding-right: 224px; min-height: 290px; }
+.singer .mark { position: absolute; top: -4px; left: -6px; font: 700 44px/1 Georgia, 'Times New Roman', serif; color: var(--accent); visibility: hidden; pointer-events: none; }      /* the breath mark, as it is pencilled into the music */
+.singer .mark.on { visibility: visible; }
+.singer.big .mark { font-size: 72px; top: -10px; left: 0; }
+.singer .says { font-size: 12.5px; line-height: 1.2; color: var(--soft); min-height: 16px; }
+.singer.big .says { font-size: 16px; font-weight: 600; min-height: 20px; }
+@media (max-width: 520px) { .track.with-singer, .track.with-singer.big-singer { padding-right: 0; min-height: 0; } .track .singer { display: none; } }
+.tools button[aria-pressed] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--chip); }
 .where-in .jump.again { margin-left: 0; }
 .where-in .pace { margin-left: auto; }
 .where-in select { font: inherit; font-size: 15px; padding: 6px 8px; min-height: 38px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); }
@@ -269,16 +279,34 @@ function measureAt(p, t) { const tl = p.timeline || []; if (!tl.length) return n
 // with each note of the part and takes the shape of its vowel - wide for "ah", spread for "ee", round for "oo", shut
 // for a hum.  What to sing comes from the score (/api/singing: when each part sings, and on what vowel), not from
 // listening to the track, so the track's own sound is left alone.
-// mouthAt: the mouth at a moment of a track -> [how far open (0 to 1), which mouth ('a' 'e' 'o' 'm', or null), seconds
-// since the note began].  notes: [[begins, lasts, mouth], ...] in order.
+// mouthAt: the mouth at a moment of a track -> [how far open (0 to 1), its shape, seconds since the note began, how high
+// the note lies in the part (0 to 1)].  notes: [[begins, lasts, vowel, turn, close, high], ...] in order.  The shape is
+// the vowel ('a' ah, 'e' eh, 'i' ee, 'o' oh, 'u' oo; 'm' a hum) for nearly all of the note, as a choir is taught: a
+// diphthong turns to its second vowel only at the very end, and a last consonant closes where the note stops ('b' the
+// lips, 't' the tongue, 's' the teeth, 'f' lip to teeth).  null between notes.
 function mouthAt(notes, t) {
-  if (!notes || !notes.length || t < notes[0][0]) return [0, null, 9];
+  if (!notes || !notes.length || t < notes[0][0]) return [0, null, 9, .5];
   let lo = 0, hi = notes.length - 1;
   while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (notes[mid][0] <= t) lo = mid; else hi = mid - 1; }
-  const n = notes[lo], since = t - n[0], left = n[0] + n[1] - t, next = notes[lo + 1];
-  if (left <= 0) return [0, null, since];
+  const n = notes[lo], since = t - n[0], left = n[0] + n[1] - t, next = notes[lo + 1], high = n[5] == null ? .5 : n[5];
+  if (left <= 0) return [0, null, since, high];
+  if (n[2] === 'm') return [0, 'm', since, high];
+  if (n[4] && left < Math.min(.06, n[1] * .25)) return [n[4] === 'b' ? 0 : .45, n[4], since, high];
   const on = next && next[0] - (n[0] + n[1]) < .06;            // the next note follows at once: the mouth does not shut between them
-  return [n[2] === 'm' ? 0 : Math.min(1, since / .07) * (on ? 1 : Math.min(1, left / .09)), n[2], since];
+  return [Math.min(1, since / .07) * (on || n[4] ? 1 : Math.min(1, left / .09)), n[3] && left < Math.min(.16, n[1] * .22) ? n[3] : n[2], since, high];
+}
+// breathAt: the breath at a moment of a track -> [how far in (0 to 1), its kind, whether this is a stretch to stagger
+// the breathing in].  breaths: [[the moment to have breathed by, kind, room], ...]: 'b' before an entrance (taken in
+// the beat before it, or in as much of that as the rest allows), 'c' a quick catch breath, 's' the start of a stretch
+// too long for one breath (room: how long it is).
+function breathAt(breaths, t) {
+  let fill = 0, kind = null, stagger = false;
+  for (const b of breaths || []) {
+    if (b[1] === 's') { if (t >= b[0] + 1 && t < b[0] + b[2] - 1) stagger = true; continue; }
+    const room = b[1] === 'c' ? .22 : Math.max(.2, Math.min(.9, b[2]));
+    if (t >= b[0] - room && t < b[0]) { fill = (t - (b[0] - room)) / room; kind = b[1]; }
+  }
+  return [fill, kind, stagger];
 }
 // Whose notes the singer sings beside a track: the part the track is named for (also where that part is left out - it
 // shows when to sing), else the part the tracks were made for, else whoever in the choir is singing.
@@ -292,24 +320,33 @@ function singerPart(file, p, sing) {
 // computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
 // shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
 const SINGER_LOOK = `precision highp float;
-uniform vec2 uRes; uniform float uOpen, uWide, uTall, uBlink, uBounce, uSway, uBreath; uniform vec3 uTint, uSkin;
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin;
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
   if (k < 0.) return length(q) - r1; if (k > a * h) return length(q - vec2(0., h)) - r2; return dot(q, vec2(a, b)) - r1; }
 float box(vec3 p, vec3 b, float r) { vec3 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.) - r; }
-vec3 headAt() { return vec3(uSway * .10, .60 + uBounce * .035 + uBreath * .012, .02); }
-vec3 inHead(vec3 p) { vec3 q = p - headAt(); float a = -uSway * .22, c = cos(a), s = sin(a); return vec3(c * q.x - s * q.y, s * q.x + c * q.y, q.z); }
-vec3 mouthSize() { return vec3(.055 + .085 * uWide, .15 * uTall * uOpen, .2); }
+float lift() { return uBreath * .012 + uIn * .045; }                         // a breath in raises everything above the waist
+vec3 headAt() { return vec3(uSway * .10, .60 + uBounce * .035 + lift(), .02); }
+vec3 inHead(vec3 p) { vec3 q = p - headAt(); float a = -uSway * .22, c = cos(a), s = sin(a); q = vec3(c * q.x - s * q.y, s * q.x + c * q.y, q.z);
+  float b = -uIn * .10; c = cos(b); s = sin(b); return vec3(q.x, c * q.y - s * q.z, s * q.y + c * q.z); }
+vec3 mouthAt() { return vec3(0., -.17 - .055 * uJaw, .50); }                 // the jaw drops, and the mouth with it
+vec3 mouthSize() { return vec3(.05 + .09 * uWide, .15 * uTall * uOpen, .2); }
+float lips(vec3 h) {                                                          // a ring round the open mouth: forward for "oo" and "oh"
+  vec3 ms = mouthSize(); if (ms.y < .012) return 1.;
+  vec3 q = h - mouthAt() - vec3(0., 0., .012 + .06 * uRound); vec2 r = ms.xy + .008;
+  return length(vec2((length(q.xy / r) - 1.) * min(r.x, r.y), q.z)) - (.016 + .014 * uRound);
+}
 vec2 scene(vec3 p) {                                 // -> (distance to the nearest surface, which thing it is)
-  float robe = max(roundCone(p - vec3(0., -.98, 0.), .60 + uBreath * .012, .33, .98), -(p.y + .98));      // (it stands on the floor)
+  float robe = max(roundCone(p - vec3(0., -.98, 0.), .60 + uBreath * .012, .33 + uIn * .045, .98), -(p.y + .98));      // (it stands on the floor)
   vec3 h = inHead(p);
-  float head = ellipsoid(h, vec3(.55, .51, .52));
-  if (mouthSize().y > .012) head = max(head, -ellipsoid(h - vec3(0., -.17, .50), mouthSize()));        // the mouth is hollowed out of it
-  float collar = length(vec2(length(p.xz) - .30, p.y - .08 - uBreath * .012)) - .085;
+  float head = smin(ellipsoid(h, vec3(.55, .51, .52)), ellipsoid(h - vec3(0., -.20 - .12 * uJaw, .05), vec3(.37, .30, .39)), .12);      // ... with a chin that drops
+  if (mouthSize().y > .012) head = max(head, -ellipsoid(h - mouthAt(), mouthSize()));        // the mouth is hollowed out of it
+  head = smin(head, lips(h), .012);
+  float collar = length(vec2(length(p.xz) - .30 - uIn * .03, p.y - .08 - lift())) - .085;
   vec3 a = vec3(abs(p.x), p.y, p.z);
-  float hands = length(a - vec3(.37, -.36 + uBounce * .012, .50)) - .105;
-  vec3 f = p - vec3(0., -.40 + uBounce * .012, .53); float c = cos(.55), s = sin(.55); f = vec3(f.x, c * f.y - s * f.z, s * f.y + c * f.z);
+  float hands = length(a - vec3(.37, -.36 + uBounce * .012 + lift() * .6, .50)) - .105;
+  vec3 f = p - vec3(0., -.40 + uBounce * .012 + lift() * .6, .53); float c = cos(.55), s = sin(.55); f = vec3(f.x, c * f.y - s * f.z, s * f.y + c * f.z);
   float folder = box(f, vec3(.33, .21, .012), .012);
   vec2 d = vec2(robe, 1.);
   if (head < d.x) d = vec2(head, 2.);
@@ -320,8 +357,8 @@ vec2 scene(vec3 p) {                                 // -> (distance to the near
 }
 vec3 normalAt(vec3 p) { vec2 e = vec2(.002, 0.); return normalize(vec3(scene(p + e.xyy).x - scene(p - e.xyy).x, scene(p + e.yxy).x - scene(p - e.yxy).x, scene(p + e.yyx).x - scene(p - e.yyx).x)); }
 vec4 shade(vec2 px) {
-  vec2 uv = (px - .5 * uRes) / uRes.y;
-  vec3 ro = vec3(0., .08, 5.3), rd = normalize(vec3(uv.x, uv.y, -2.05));
+  vec2 uv = (px - .5 * uRes) / uRes.y / mix(1., 2.0, uZoom);                 // close up: the face fills the picture
+  vec3 ro = vec3(0., mix(.08, .50, uZoom), 5.3), rd = normalize(vec3(uv.x, uv.y, -2.05));
   float t = 3.6, hit = 0.; vec2 d;
   for (int i = 0; i < 56; i++) { d = scene(ro + rd * t); if (d.x < .0012) { hit = 1.; break; } t += d.x; if (t > 8.2) break; }
   if (hit < .5) {                                    // nothing there: only the figure's shadow on the floor
@@ -330,26 +367,33 @@ vec4 shade(vec2 px) {
     return vec4(0., 0., 0., sh);
   }
   vec3 p = ro + rd * t, n = normalAt(p), h = inHead(p), col;
-  vec3 cream = uSkin, robe = uTint; float fair = dot(uSkin, vec3(.2126, .7152, .0722));      // the singer's own skin, and how light it is
+  vec3 skin = uSkin, robe = uTint; float fair = dot(uSkin, vec3(.2126, .7152, .0722));      // the singer's own skin, and how light it is
   if (d.y < 1.5) col = robe * (.82 + .18 * smoothstep(-.9, .1, p.y));
   else if (d.y < 2.5) {
-    col = cream;
-    float inMouth = mouthSize().y > .012 ? ellipsoid(h - vec3(0., -.17, .50), mouthSize() + .012) : 1.;
-    if (inMouth < 0.) col = mix(vec3(.36, .10, .13), vec3(.86, .40, .44), smoothstep(-.30, -.22, h.y - .5 * (h.z - .40)));      // the dark of the mouth, a tongue below
+    col = skin;
+    vec3 ms = mouthSize(), mc = mouthAt(), q = h - mc;
+    float inMouth = ms.y > .012 ? ellipsoid(q, ms + .004) : 1.;
+    if (inMouth < 0.) {
+      col = mix(vec3(.30, .08, .11), vec3(.86, .40, .44), smoothstep(-.9, -.35, q.y / ms.y - 1.6 * (h.z - .42)));      // the dark of the mouth, a tongue below
+      col = mix(col, vec3(.90, .46, .50), uTongue * smoothstep(.05, .45, q.y / ms.y) * smoothstep(.75, .4, abs(q.x) / ms.x));      // ... or its tip up behind the teeth
+      float upper = smoothstep(1. - 1.1 * uTeeth - .08, 1. - 1.1 * uTeeth + .08, q.y / ms.y);                              // the upper teeth, as far as they show
+      col = mix(col, vec3(.97, .96, .93), upper * step(.01, uTeeth) * smoothstep(.95, .75, abs(q.x) / ms.x));
+    }
+    else if (lips(h) < .006) col = mix(skin, vec3(.74, .30, .32), mix(.50, .42, fair));
     else if (h.z > 0.) {
       vec2 e = vec2(abs(h.x) - .19, h.y - .075);                                           // the eyes: dark, with a light in each
-      float eye = length(e / vec2(.062, .082));                                           // ... or shut, as a happy curve
+      float eye = length(e / vec2(.062, .082 * (1. + .18 * uIn)));                         // ... or shut, as a happy curve
       float lid = smoothstep(.016, .008, abs(e.y - .012 + 4.5 * e.x * e.x)) * smoothstep(.07, .055, abs(e.x));
       col = mix(col, vec3(.07, .05, .09), mix(smoothstep(1.05, .9, eye), lid, uBlink));
       col = mix(col, vec3(1.), smoothstep(.028, .018, length(e - vec2(-.02 * sign(h.x) + .012, .03))) * (1. - uBlink));
       col = mix(col, mix(vec3(.72, .22, .20), vec3(1., .60, .60), fair), mix(.38, .55, fair) * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks, warm on every skin
-      float shut = 1. - smoothstep(.012, .03, mouthSize().y);                               // a small smile while the mouth is shut
+      float shut = 1. - smoothstep(.012, .03, ms.y);                                       // a small smile while the mouth is shut
       float line = abs(h.y + .195 - 2.2 * h.x * h.x);
       col = mix(col, mix(uSkin * .32, vec3(.42, .20, .22), fair), shut * smoothstep(.017, .009, line) * smoothstep(.10, .08, abs(h.x)));
     }
   }
   else if (d.y < 3.5) col = vec3(.98);
-  else if (d.y < 4.5) col = cream;
+  else if (d.y < 4.5) col = skin;
   else col = vec3(.16, .14, .22);
   vec3 l = normalize(vec3(-.45, .8, .65));
   float dif = pow(.5 + .5 * dot(n, l), 1.6), ao = 1.;
@@ -363,7 +407,12 @@ void main() {
   for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++) { vec4 s = shade(gl_FragCoord.xy + (vec2(float(i), float(j)) - .5) * .5); c += vec4(s.rgb * s.a, s.a); }
   gl_FragColor = c * .25;                            // (colour already multiplied by how solid it is, as the page expects)
 }`;
-const MOUTHS = { a: [.62, 1], e: [1, .5], o: [.2, .52], m: [.45, 0] };          // each vowel's mouth: how wide, how tall
+// Each mouth: how wide, how tall, how far the lips come forward, how much of the upper teeth shows, the tongue's tip up.
+// They are a choir's vowels, not speech's: "ah" tall with the jaw dropped, "ee" kept narrow and tall-ish (not a grin),
+// "oh" and "oo" with the lips forward; then the closes - lips for m b p, tongue for t d n l, teeth for s, lip to teeth for f v.
+const MOUTHS = { a: [.55, 1, .15, 0, 0], e: [.8, .62, 0, .25, 0], i: [.66, .4, 0, .45, 0], o: [.34, .78, .7, 0, 0], u: [.16, .46, 1, 0, 0],
+  m: [.45, 0, 0, 0, 0], b: [.45, 0, 0, 0, 0], t: [.6, .5, 0, .3, 1], s: [.7, .36, 0, 1, 0], f: [.55, .32, 0, .8, 0] };
+const SAYS = { a: 'ah', e: 'eh', i: 'ee', o: 'oh', u: 'oo', m: 'mm' };          // what the vowel is called, under the close-up
 // The singers are not all one colour.  The first figure had one cream head for everybody, meant as "neutral" - and a
 // listener asked why all the little people were white.  Skin tones, deep to light: each track's singer has its own.
 const TONES = [[.25, .15, .11], [.36, .23, .16], [.50, .32, .22], [.63, .42, .29], [.76, .55, .40], [.87, .69, .54], [.96, .83, .71]];
@@ -373,11 +422,15 @@ function singerTone(pid, index) { let h = 0; for (const ch of String(pid)) h = (
 const singer = {
   on: (() => { try { return localStorage.getItem('palare-singer') !== '0'; } catch (e) { return true; } })(),
   still: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
-  s: { open: 0, wide: .45, tall: 0, blink: 0, bounce: 0, sway: 0, breath: 0, lively: 0 }, tint: [.42, .18, .63], skin: TONES[3], running: false,
+  s: { open: 0, wide: .45, tall: 0, round: 0, jaw: 0, teeth: 0, tongue: 0, blink: 0, bounce: 0, sway: 0, breath: 0, inn: 0, zoom: 0, lively: 0 },
+  tint: [.42, .18, .63], skin: TONES[3], running: false, big: false,
   make() {                                           // once: the picture, and the lines that draw it
     if (this.canvas !== undefined) return this.gl;
-    const c = this.canvas = document.createElement('canvas'); c.className = 'singer'; c.setAttribute('aria-hidden', 'true');
-    const k = Math.min(2, window.devicePixelRatio || 1); c.width = Math.round(104 * k); c.height = Math.round(128 * k);
+    const c = this.canvas = document.createElement('canvas');
+    this.mark = el('span', { class: 'mark' }, '’'); this.says = el('div', { class: 'says' });
+    this.box = el('div', { class: 'singer', title: 'Click for a close look at the mouth' }, c, this.mark, this.says);
+    this.box.addEventListener('click', () => this.close(!this.big));
+    this.size();
     const gl = this.gl = c.getContext('webgl', { premultipliedAlpha: true, antialias: false });
     if (!gl) return null;
     const sh = (kind, src) => { const x = gl.createShader(kind); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
@@ -387,30 +440,48 @@ const singer = {
       if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
       gl.useProgram(pr); gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0); gl.bindAttribLocation(pr, 0, 'p'); gl.vertexAttribPointer(gl.getAttribLocation(pr, 'p'), 2, gl.FLOAT, false, 0, 0);
-      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uTint', 'uSkin'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
+      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uRound', 'uJaw', 'uTeeth', 'uTongue', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uIn', 'uZoom', 'uTint', 'uSkin'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
     } catch (e) { this.gl = null; this.why = String(e.message || e); }
     return this.gl;
+  },
+  size() { const k = Math.min(2, window.devicePixelRatio || 1) * (this.big ? 2 : 1); this.canvas.width = Math.round(104 * k); this.canvas.height = Math.round(128 * k); },
+  close(big) {                                       // a close look at the mouth, and back
+    this.big = big; this.size(); this.box.classList.toggle('big', big); this.box.title = big ? 'Click to step back' : 'Click for a close look at the mouth';
+    const tr = this.box.closest('.track'); if (tr) tr.classList.toggle('big-singer', big);
+    this.run(); if (!this.running) this.draw();
   },
   draw() {
     const gl = this.gl, s = this.s, at = this.at; if (!gl) return;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height); gl.uniform2f(at.uRes, this.canvas.width, this.canvas.height);
-    gl.uniform1f(at.uOpen, s.open); gl.uniform1f(at.uWide, s.wide); gl.uniform1f(at.uTall, s.tall); gl.uniform1f(at.uBlink, s.blink);
-    gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway); gl.uniform1f(at.uBreath, s.breath); gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]); gl.uniform3f(at.uSkin, this.skin[0], this.skin[1], this.skin[2]);
+    gl.uniform1f(at.uOpen, s.open); gl.uniform1f(at.uWide, s.wide); gl.uniform1f(at.uTall, s.tall); gl.uniform1f(at.uRound, s.round); gl.uniform1f(at.uJaw, s.jaw);
+    gl.uniform1f(at.uTeeth, s.teeth); gl.uniform1f(at.uTongue, s.tongue); gl.uniform1f(at.uBlink, s.blink); gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway);
+    gl.uniform1f(at.uBreath, s.breath); gl.uniform1f(at.uIn, s.inn); gl.uniform1f(at.uZoom, s.zoom);
+    gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]); gl.uniform3f(at.uSkin, this.skin[0], this.skin[1], this.skin[2]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   },
   step(dt, now) {                                    // one moment on: towards what the track is doing
-    const s = this.s, a = this.audio, playing = !!(a && !a.paused && !a.ended);
-    const [open, mouth, since] = playing && this.notes ? mouthAt(this.notes, a.currentTime + .05) : [0, null, 9];
-    const to = (x, y, secs) => x + (y - x) * (1 - Math.exp(-dt / secs)), m = MOUTHS[mouth] || [.45, s.tall];
-    s.open = to(s.open, open, open > s.open ? .035 : .06); s.wide = to(s.wide, m[0], .05); s.tall = to(s.tall, mouth ? m[1] : s.tall, .05);
-    if (mouth && since < this.since && !this.still) s.bounce = 1;                         // a new note: a little lift
-    this.since = mouth ? since : 9; s.bounce = to(s.bounce, 0, .16);
+    const s = this.s, a = this.audio, playing = !!(a && !a.paused && !a.ended), t = a ? a.currentTime + .05 : 0;
+    let [open, mouth, since, high] = playing && this.notes ? mouthAt(this.notes, t) : [0, null, 9, .5];
+    const [fill, kind, stagger] = playing ? breathAt(this.breaths, t) : [0, null, false];
+    if (fill > 0) { mouth = (mouthAt(this.notes, t + 1)[1] || 'a'); if (!MOUTHS[mouth] || !MOUTHS[mouth][1] || 'bts f'.includes(mouth)) mouth = 'a'; open = .34; since = 9; }      // a breath: in the shape of the vowel to come
+    const to = (x, y, secs) => x + (y - x) * (1 - Math.exp(-dt / secs)), m = MOUTHS[mouth] || [.45, s.tall, s.round, 0, 0];
+    const tall = mouth ? m[1] * (1 + .3 * (high - .5)) : s.tall;                         // a high note: more room
+    s.open = to(s.open, open, open > s.open ? .035 : .06); s.wide = to(s.wide, m[0], .05); s.tall = to(s.tall, tall, .05);
+    s.round = to(s.round, mouth ? m[2] : 0, .06); s.teeth = to(s.teeth, mouth ? m[3] : 0, .05); s.tongue = to(s.tongue, mouth ? m[4] : 0, .04);
+    s.jaw = to(s.jaw, Math.min(1.2, open * tall), .06);
+    s.inn = to(s.inn, fill > 0 ? .35 + .65 * fill : 0, fill > 0 ? .08 : .3);
+    if (mouth && since < this.since && !this.still && !fill) s.bounce = 1;               // a new note: a little lift
+    this.since = mouth && !fill ? since : 9; s.bounce = to(s.bounce, 0, .16);
     s.lively = to(s.lively, playing && mouth ? 1 : 0, playing && mouth ? .3 : .9);
     s.sway = this.still ? 0 : Math.sin(now * 1.7) * .5 * s.lively; s.breath = this.still ? 0 : Math.sin(now * 1.1);
+    s.zoom = to(s.zoom, this.big ? 1 : 0, this.still ? .001 : .12);
     if (now > (this.blinkAt || 0)) { this.blinkAt = now + 2.5 + Math.random() * 3; this.blinkFrom = now; }
-    this.bliss = to(this.bliss || 0, mouth && mouth !== 'm' && since > 1.1 && open > .9 ? 1 : 0, .12);      // a long note: eyes shut, happily
+    this.bliss = to(this.bliss || 0, mouth && !fill && 'aeiou'.includes(mouth) && since > 1.1 && open > .9 ? 1 : 0, .12);      // a long note: eyes shut, happily
     s.blink = Math.max(now - (this.blinkFrom || -9) < .13 ? 1 : 0, this.bliss > .5 ? 1 : 0);
-    return playing || s.lively > .02 || s.open > .02 || s.blink > 0;
+    const mark = fill > 0, word = mark ? (kind === 'c' ? 'quick breath' : 'breathe') : stagger ? 'stagger your breathing' : this.big && mouth && SAYS[mouth] && open > .3 ? SAYS[mouth] : '';
+    if (mark !== this.marked) { this.marked = mark; this.mark.classList.toggle('on', mark); }
+    if (word !== this.said) { this.said = word; this.says.textContent = word; }
+    return playing || s.lively > .02 || s.open > .02 || s.blink > 0 || s.inn > .02 || Math.abs(s.zoom - (this.big ? 1 : 0)) > .01;
   },
   run() {
     if (this.running || !this.gl) return; this.running = true; let last = performance.now();
@@ -420,16 +491,16 @@ const singer = {
   },
   sing(node, audio, p, f, tint) {                    // a track has begun to play: stand beside it and sing its part
     if (!this.on || !this.make()) return;
-    document.querySelectorAll('.track.with-singer').forEach(x => { if (x !== node) x.classList.remove('with-singer'); });
-    if (this.canvas.parentNode !== node) node.prepend(this.canvas); node.classList.add('with-singer');
+    document.querySelectorAll('.track.with-singer').forEach(x => { if (x !== node) x.classList.remove('with-singer', 'big-singer'); });
+    if (this.box.parentNode !== node) node.prepend(this.box); node.classList.add('with-singer'); node.classList.toggle('big-singer', this.big);
     const m = /^#(..)(..)(..)$/.exec(tint || ''); this.tint = m ? m.slice(1).map(x => parseInt(x, 16) / 255) : [.42, .18, .63];
     this.skin = TONES[singerTone(p.id, (p.tracks || []).indexOf(f))];
-    this.audio = audio; this.notes = null; this.since = 9;
-    const use = sing => { if (this.audio === audio && sing && sing.parts) { const k = singerPart(f, p, sing); this.notes = k === 'all' ? sing.all : sing.parts[k]; } };
+    this.audio = audio; this.notes = this.breaths = null; this.since = 9;
+    const use = sing => { if (this.audio === audio && sing && sing.parts) { const k = singerPart(f, p, sing), who = k === 'all' ? sing.all : sing.parts[k]; this.notes = who.notes; this.breaths = who.breaths; } };
     if (SING[p.id]) use(SING[p.id]); else post('/api/singing', { id: p.id }).then(j => { SING[p.id] = j; use(j); }).catch(() => {});
     this.run();
   },
-  show(on) { this.on = on; try { localStorage.setItem('palare-singer', on ? '1' : '0'); } catch (e) {} if (!on) { document.querySelectorAll('.track.with-singer').forEach(x => x.classList.remove('with-singer')); if (this.canvas) this.canvas.remove(); } },
+  show(on) { this.on = on; try { localStorage.setItem('palare-singer', on ? '1' : '0'); } catch (e) {} if (!on) { document.querySelectorAll('.track.with-singer').forEach(x => x.classList.remove('with-singer', 'big-singer')); if (this.box) this.box.remove(); } },
 };
 const SING = {};                                     // piece -> what its singer sings: asked for when a track of it is first played
 // A passage to repeat: from the beginning of measure a to the end of measure b, in a track whose measures begin at
@@ -622,6 +693,7 @@ function noteColumn(pid, m, st, nt) {
       g.append(head);
     });
   }
+  if (!nt.rest && nt.breath) g.append(SVG('text', { x: 85, y: nt.breath === ',' ? 30 : 14, 'text-anchor': 'end', 'font-size': nt.breath === ',' ? 36 : 11, 'font-weight': 700, fill: 'var(--accent)', 'font-family': nt.breath === ',' ? 'Georgia, serif' : null }, nt.breath === ',' ? '’' : 'no breath'));      // as a choir pencils it in
   const names = nt.rest ? '' : nt.pitches.slice().sort((a, b) => b.step - a.step).map(q => q.sounds).join(' / ');
   const box = nt.rest ? null : el('input', { type: 'text', class: unsure ? 'doubt' : null, value: nt.word, placeholder: nt.held ? '(held)' : '–', 'aria-label': 'Word under this note', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
   if (box) box.addEventListener('change', () => fixPost(pid, '/api/fix/word', { line: st.line, t: nt.t, text: box.value }));
@@ -716,6 +788,10 @@ function paintFixer(pid) {
         el('button', { onclick: () => fixPost(pid, '/api/fix/spoken', { line: k.line, t: k.t, on: !nt.spoken }), 'aria-pressed': !!nt.spoken, title: 'In the printed music a spoken note has an x for its head' }, '✕ Spoken'), el('span', { class: 'gap' }),
         el('button', { onclick: () => moveNote(pid, { step: 1 }) }, '▲ Higher'), el('button', { onclick: () => moveNote(pid, { step: -1 }) }, '▼ Lower'), el('span', { class: 'gap' }),
         el('button', { onclick: () => moveNote(pid, { sign: '#' }), 'aria-pressed': q.sign === '#' }, '♯ Sharp'), el('button', { onclick: () => moveNote(pid, { sign: 'b' }), 'aria-pressed': q.sign === 'b' }, '♭ Flat'), el('button', { onclick: () => moveNote(pid, { sign: 'n' }), 'aria-pressed': q.sign === 'n' }, '♮ Natural'), q.sign ? el('button', { onclick: () => moveNote(pid, { sign: '' }) }, 'No sign') : null));
+      if (q) kids.push(el('div', { class: 'tools' }, el('span', { class: 'is' }, 'After this note:'),
+        el('button', { onclick: () => fixPost(pid, '/api/fix/breath', { line: k.line, t: k.t, how: nt.breath === ',' ? '' : ',' }), 'aria-pressed': nt.breath === ',' }, '’ Breathe here'),
+        el('button', { onclick: () => fixPost(pid, '/api/fix/breath', { line: k.line, t: k.t, how: nt.breath === '&' ? '' : '&' }), 'aria-pressed': nt.breath === '&' }, 'No breath here'),
+        el('span', { class: 'small' }, nt.breath ? '' : 'Unmarked, the little singer breathes at rests and at commas in the words.')));
     }
   });
   if (focus && m.staves.length > m.staves.filter(marked).length) kids.push(el('p', null, el('button', { class: 'quiet', onclick: () => { f.all = true; paintFixer(pid); } }, 'Show the other parts in this measure too')));

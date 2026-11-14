@@ -141,7 +141,8 @@ def measure(path, n, unsure=()):
             if not m:
                 continue                                   # a dynamic mark: left where it is, not shown
             note = dict(t=t, beats=scoremod._dur(m['d']), length=_length(m['d']), code=m['d'], rest=m['p'] == 'r',
-                        word='' if m['l'] in (None, '_', '*') else m['l'], held=m['l'] == '_', tie='~' in (m['f'] or ''), spoken='x' in (m['f'] or ''), pitches=[])
+                        word='' if m['l'] in (None, '_', '*') else m['l'], held=m['l'] == '_', tie='~' in (m['f'] or ''), spoken='x' in (m['f'] or ''),
+                        breath=',' if ',' in (m['f'] or '') else '&' if '&' in (m['f'] or '') else '', pitches=[])
             if not note['rest']:
                 for k, p in enumerate(m['p'].split('+')):
                     q = PITCH.match(p)
@@ -435,6 +436,20 @@ def spoken(path, n, line, t, on):
             raise Refused('That is a rest.')
         flags = (m['f'] or '').replace('x', '')
         return m['p'] + '/' + m['d'] + ('x' if on else '') + flags + ('=' + m['l'] if m['l'] else '')
+    return _change(path, n, line, t, new)
+
+
+def breath(path, n, line, t, how):
+    """Mark where to breathe, as a choir is told it measure by measure: how = ',' a breath after this note, '&' no
+    breath after it (carry on, whatever a rest or a comma in the words suggests), '' leave it to the music."""
+    if how not in (',', '&', ''):
+        raise Refused('Choose a breath, no breath, or neither.')
+
+    def new(m):
+        if m['p'] == 'r':
+            raise Refused('That is a rest: mark the breath on the note before it.')
+        flags = (m['f'] or '').replace(',', '').replace('&', '')
+        return m['p'] + '/' + m['d'] + flags + how + ('=' + m['l'] if m['l'] else '')
     return _change(path, n, line, t, new)
 
 

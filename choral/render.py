@@ -7,6 +7,7 @@ front of a stereo microphone pair; two leaders per section are also on close mic
 carries the words.  Every section is kept on its own stem so one part can be brought forward,
 left out, or heard alone.
 """
+import re
 import argparse, os, time, wave
 import numpy as np
 from multiprocessing import Pool, cpu_count
@@ -84,52 +85,98 @@ def measure_starts(sc, clock):
     return [[round(float(np.interp(b0, clock[0], clock[1])), 2), int((sc.printed or {}).get(m, m))] for m, (b0, _) in order]
 
 
-OPEN, SPREAD, ROUND = 'AA AE AH AO AX AY AW LA'.split(), 'EH ER EY IH IY LE LI'.split(), 'OW OY UH UW LO LU'.split()
+VOWEL = {**dict.fromkeys('AA AE AH AX LA'.split(), 'a'), **dict.fromkeys('EH ER LE'.split(), 'e'), **dict.fromkeys('IY IH LI'.split(), 'i'),
+         **dict.fromkeys('AO LO'.split(), 'o'), **dict.fromkeys('UW UH LU'.split(), 'u'),
+         'AY': 'ai', 'EY': 'ei', 'OY': 'oi', 'AW': 'au', 'OW': 'ou'}          # a diphthong: its long first vowel, and where it turns at the very end
+CLOSES = {**dict.fromkeys('m b p'.split(), 'b'), **dict.fromkeys('t d n l'.split(), 't'), **dict.fromkeys('s z sh zh ch jh'.split(), 's'),
+          **dict.fromkeys('f v'.split(), 'f')}                                # what is seen of a last consonant: lips, tongue, teeth, lip to teeth
+STAGGER = 10.      # seconds: a stretch longer than this with nowhere to breathe is one a choir staggers its breathing in
 
 
 def mouth(phonemes):
-    """The shape of a singer's mouth on a syllable (the engine's phonemes): 'a' wide open (ah), 'e' spread (ee, eh),
-    'o' round (oo, oh), 'm' lips together (a hum, or a drum syllable hummed on its consonant).  None for a note that
-    carries the syllable before it on."""
-    ph = phonemes if isinstance(phonemes, str) else ' '.join(phonemes)
-    if ph.strip() == '-':
+    """A singer's mouth on a syllable (the engine's phonemes) -> (the vowel it is sung on, the vowel it turns to at
+    the very end, how it closes).  The vowel is one of the five a choir is taught to match: 'a' ah, 'e' eh, 'i' ee,
+    'o' oh, 'u' oo - or 'm', lips together, for a hum (and a drum syllable hummed on its consonant).  A diphthong is
+    its first vowel, long, and its second only at the last moment ("my": ah, then ee).  The close is what can be
+    seen of a final consonant: 'b' lips, 't' the tongue behind the teeth, 's' teeth together, 'f' lip to teeth.
+    None for a note that carries the syllable before it on."""
+    ph = (phonemes if isinstance(phonemes, str) else ' '.join(phonemes)).split()
+    if ph == ['-']:
         return None
     if '+' in ph:
-        return 'm'
-    for x in ph.split():
-        v = x.rstrip('012')
-        if v in OPEN or v in SPREAD or v in ROUND:
-            return 'a' if v in OPEN else 'e' if v in SPREAD else 'o'
-    return 'm'
+        return ('m', '', '')
+    for k, x in enumerate(ph):
+        v = VOWEL.get(x.rstrip('012'))
+        if v:
+            return (v[0], v[1:], CLOSES.get(ph[-1], '') if k < len(ph) - 1 else '')
+    return ('m', '', '')
+
+
+def _sung(sc, part, at):
+    """One part: its notes as the little singer sings them, and where it breathes."""
+    src = sc.parts[part]
+    pitches = [float(np.mean(n['midi'])) for n in src]
+    lo, hi = min(pitches), max(pitches)
+    notes, last = [], ('a', '', '')
+    for n, pitch in zip(src, pitches):
+        a, b = at(n['beat']), at(n['beat'] + n['dur'])
+        m = mouth(n['phon'])
+        held = m is None and bool(notes)
+        if held:                                   # the syllable goes on: its turn and its close move to this, its last note
+            notes[-1][3] = notes[-1][4] = ''
+        else:
+            last = m or ('a', '', '')
+        notes.append([round(a, 2), round(b - a, 2), last[0], last[1], last[2], round((pitch - lo) / (hi - lo), 1) if hi > lo else .5])
+    # Where to breathe.  Before every entrance (a rest, however short, is where a choir breathes); where the words
+    # have a comma or a full stop and no rest, a quick catch breath when that syllable's last note ends; and where
+    # the music says so: "," after a note is a breath there, "&" forbids one, whatever the rest or the words suggest.
+    breaths, since = [], None
+    stop = lambda n: bool(re.search(r"[,.;:!?]['\"”’)]*$", n['lyric'] or ''))
+    for i, (n, x) in enumerate(zip(src, notes)):
+        gap = x[0] - (notes[i - 1][0] + notes[i - 1][1]) if i else x[0]
+        before = src[i - 1]['flags'] if i else set()
+        said = i and (stop(src[i - 1]) or (pending and (n['lyric'] or '_') != '_'))
+        pending = bool(i) and (pending or stop(src[i - 1])) and (n['lyric'] or '_') == '_' and gap < .12 if i else False
+        if '&' in before:
+            kind = None
+        elif not i or gap >= .12:
+            kind = 'b'
+        elif ',' in before or (said and not pending):
+            kind = 'c'
+        else:
+            kind = None
+        if kind:
+            if since is not None and x[0] - since > STAGGER:
+                breaths.append([since, 's', round(notes[i - 1][0] + notes[i - 1][1] - since, 2)])
+            breaths.append([x[0], kind, round(min(gap, at(n['beat'] + 1) - at(n['beat'])) if kind == 'b' else .25, 2)])      # (a beat's worth of room, if the rest is that long)
+            since = x[0]
+    if notes and since is not None and notes[-1][0] + notes[-1][1] - since > STAGGER:
+        breaths.append([since, 's', round(notes[-1][0] + notes[-1][1] - since, 2)])
+    return dict(notes=notes, breaths=sorted(breaths, key=lambda b: (b[0], b[1] == 's')))
 
 
 def singing(sc, clock):
-    """When each part sings, and with what mouth - for the little singer the page shows beside a track as it plays.
-    -> {'parts': {part: [[seconds, how long, mouth], ...]}, 'all': the same for the whole choir: whoever is singing,
-    the highest part first}.  It is taken from the score and the clock the voices were timed by, not from the sound:
-    the page then has no need to listen to its own tracks, and the mouth can make the vowel that is being sung."""
+    """What each part sings, for the little singer the page shows beside a track as it plays.
+    -> {'parts': {part: {'notes': [[seconds, how long, vowel, turn, close, how high in the part (0 to 1)], ...],
+                         'breaths': [[seconds, kind, room], ...]}},
+        'all': the same for the whole choir - whoever is singing, the highest part first}.
+    A breath is 'b' before an entrance (room: the seconds there are for it), 'c' a quick catch breath, or 's' the
+    start of a stretch too long for one breath (room: how long it is), where a choir staggers its breathing.
+    It is taken from the score and the clock the voices were timed by, not from the sound: the page then has no need
+    to listen to its own tracks, and the mouth can make the vowel that is being sung."""
     at = lambda beat: float(np.interp(float(beat), clock[0], clock[1]))
-    parts = {}
-    for part, notes in sc.parts.items():
-        out, last = [], 'a'
-        for n in engine_notes(sc, part) if notes else []:
-            a, b = at(n[0]), at(n[0] + n[1])
-            last = mouth(n[3]) or last
-            if out and n[3] == '-' and n[1] <= .25 and abs(out[-1][0] + out[-1][1] - a) < .02:        # the steps of a slide: one mouth, held
-                out[-1][1] = round(b - out[-1][0], 2)
-            elif b - a > .01:
-                out.append([round(a, 2), round(b - a, 2), last])
-        if out:
-            parts[part] = out
+    parts = {part: _sung(sc, part, at) for part, notes in sc.parts.items() if notes}
     everyone = []                                  # the highest part's notes; where it rests, the next part's; and so on down
     for part in [p for p in ('SOLO', 'T1', 'T2', 'BR', 'BS', 'TR1', 'TR2', 'TR3') if p in parts]:
-        for a, d, m in parts[part]:
-            pieces = [(a, a + d)]
-            for x, e, _ in everyone:
-                pieces = [q for s0, s1 in pieces for q in ((s0, min(s1, x)), (max(s0, x + e), s1)) if q[1] - q[0] > .05]
-            everyone += [[round(s0, 2), round(s1 - s0, 2), m] for s0, s1 in pieces]
-        everyone.sort()
-    return dict(parts=parts, all=everyone)
+        for n in parts[part]['notes']:
+            pieces = [(n[0], n[0] + n[1])]
+            for x in everyone:
+                pieces = [q for s0, s1 in pieces for q in ((s0, min(s1, x[0])), (max(s0, x[0] + x[1]), s1)) if q[1] - q[0] > .05]
+            everyone += [[round(s0, 2), round(s1 - s0, 2)] + n[2:] for s0, s1 in pieces]
+        everyone.sort(key=lambda n: n[0])
+    together = [[n[0], 'b', round(min(1., n[0] - (everyone[i - 1][0] + everyone[i - 1][1]) if i else n[0]), 2)] for i, n in enumerate(everyone)
+                if not i or n[0] - (everyone[i - 1][0] + everyone[i - 1][1]) >= .12]
+    return dict(parts=parts, all=dict(notes=everyone, breaths=together))
 
 
 def engine_notes(sc, part):

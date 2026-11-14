@@ -32,6 +32,6 @@ mkdir "$WORK/library"
 SERVER=$!
 n=0; until curl -s -o /dev/null "http://127.0.0.1:$PORT/" || [ "$n" -ge 40 ]; do sleep .25; n=$((n + 1)); done
 
-echo "Making tracks for the demo piece and using the page in Safari's engine (about a minute; a small window opens)..."
+echo "Making tracks for the demo piece and using the page in Safari's engine (about a minute; its window is too faint to see)..."
 "$WORK/window" "http://127.0.0.1:$PORT/" "$ROOT"/tools/safari/s?_*.js show >"$WORK/said.txt" 2>&1 || { echo "The window did not finish:" >&2; tail -5 "$WORK/said.txt" >&2; exit 1; }
 tail -1 "$WORK/said.txt" | "$PY" "$ROOT/tools/safari/check.py"

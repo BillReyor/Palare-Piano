@@ -16,7 +16,7 @@ VOCAL = {'TEN': ('T1', 'T2'), 'LOW': ('BR', 'BS'), 'T1': ('T1',), 'T2': ('T2',),
          'TRIO': ('TR1', 'TR2'), 'TR1': ('TR1',), 'TR2': ('TR2',), 'TR3': ('TR3',)}
 PIANO = ('RH', 'RH2', 'RH3', 'LH', 'LH2', 'LH3', 'IN', 'IN2', 'IN3', 'IN4')    # IN: an instrument's line (a clarinet over the choir), played by the piano
 TOKEN = re.compile(r"^(?P<p>r|[a-g](?:##|bb|[#bn])?-?\d~?(?:\+[a-g](?:##|bb|[#bn])?-?\d~?)*)/(?P<d>[whqest]3?\.*)"
-                   r"(?P<f>(?:~|\^|>|'|x|%gl)*)(?:=(?P<l>\S+))?$")           # x: spoken, not sung (an x-shaped notehead)
+                   r"(?P<f>(?:~|\^|>|'|x|,|&|%gl)*)(?:=(?P<l>\S+))?$")       # x: spoken, not sung (an x-shaped notehead)
 
 
 class ScoreError(Exception):
@@ -277,7 +277,7 @@ def _line(sc, mnum, name, toks, beat0, meas_len, keysig, warn):
         if not mt:
             raise ScoreError(f'measure {mnum} {name}: cannot read "{tok}"')
         d = _dur(mt['d'])
-        flags = set(re.findall(r"~|\^|>|'|x|%gl", mt['f']))
+        flags = set(re.findall(r"~|\^|>|'|x|,|&|%gl", mt['f']))         # (",": a breath after this note; "&": none - carry on)
         lyric = mt['l']
         if lyric == '*':                               # take the next recognized syllable for this staff
             key = next((k for k in ((sc.system, name), (sc.system, 'TEN' if name in ('T1', 'T2') else 'LOW'))

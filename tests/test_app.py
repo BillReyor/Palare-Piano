@@ -677,8 +677,8 @@ def test_the_singers_mouth_is_worked_out_from_the_score_and_kept(lib, monkeypatc
     with_tracks(lib, pid)
     app.save(pid, read=app.what_was_read(pid))
     got = app.act('/api/singing', {'id': pid}, None)
-    assert set(got['parts']) == {'T1', 'T2', 'BR', 'BS'} and got['all']
-    assert got['parts']['T1'][0] == [1.0, 0.6, 'a']                     # "la", a quarter note at 100 to the minute, after a second's silence
+    assert set(got['parts']) == {'T1', 'T2', 'BR', 'BS'} and got['all']['notes']
+    assert got['parts']['T1']['notes'][0][:3] == [1.0, 0.6, 'a'] and got['parts']['T1']['breaths'][0][:2] == [1.0, 'b']                     # "la", a quarter note at 100 to the minute, after a second's silence
     assert got['labels'] == {'Tenor 1': 'T1', 'Tenor 2': 'T2', 'Baritone': 'BR', 'Bass': 'BS'}
     # the second time it is not worked out again
     monkeypatch.setattr(app.subprocess, 'run', lambda *a, **k: pytest.fail('it was kept'))
@@ -690,11 +690,11 @@ def test_the_singers_mouth_is_worked_out_again_when_the_score_changes(lib):
     pid = app.add('two lines.score', TWO_LINES)
     with_tracks(lib, pid)
     app.save(pid, read=app.what_was_read(pid))
-    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1'][0][2] == 'a'
+    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1']['notes'][0][2] == 'a'
     sf = app.score_of(pid)
     open(sf, 'wb').write(TWO_LINES.replace(b'=la', b'=see'))
     os.utime(sf, (time.time() + 5, time.time() + 5))
-    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1'][0][2] == 'e'
+    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1']['notes'][0][2] == 'i'
 
 
 def test_parts_that_sing_one_line_share_a_singer(lib):

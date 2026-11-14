@@ -208,3 +208,49 @@ def test_what_a_move_would_sound_as_follows_the_signs_before_it(tmp_path):
     assert e['would']['up'] == 54              # up from E to F: the sharp printed earlier in the measure still holds
     assert a['would']['up'] == 59              # up from A to B: the natural printed earlier holds, not the key's flat
     assert a['would']['b'] == 56 and a['would']['#'] == 58 and a['would']['n'] == a['would'][''] == 57
+
+
+# ---- a breath marked on a note, as the choir was told it
+def first_note(path, n=2):
+    m = fix.measure(path, n)
+    st = m['staves'][0]
+    return st['line'], next(x for x in st['notes'] if not x['rest'])
+
+
+def test_a_breath_can_be_marked_after_a_note_forbidden_there_or_left_to_the_music(demo_score):
+    line, nt = first_note(demo_score)
+    assert nt['breath'] == ''
+    mark = lambda how: next(x for x in next(s for s in fix.breath(demo_score, 2, line, nt['t'], how)['staves'] if s['line'] == line)['notes'] if x['t'] == nt['t'])
+    assert mark(',')['breath'] == ','
+    tok = [l for l in open(demo_score).read().splitlines() if l.startswith('TEN:')][1].split()[1 + nt['t']]
+    assert tok == 'f4/e,=Shen-'                                    # the mark sits between the note's value and its word
+    assert mark('&')['breath'] == '&' and mark('&')['word'] == 'Shen-'
+    assert mark('')['breath'] == ''
+    assert [l for l in open(demo_score).read().splitlines() if l.startswith('TEN:')][1].split()[1 + nt['t']] == 'f4/e=Shen-'
+    scoremod.load(demo_score)                                      # and the score still reads
+
+
+def test_a_marked_breath_is_one_the_little_singer_takes(demo_score):
+    from choral import render as R
+    line, nt = first_note(demo_score)
+    before = R.singing(scoremod.load(demo_score), R.clock_for(scoremod.load(demo_score)))['parts']['T1']['breaths']
+    fix.breath(demo_score, 2, line, nt['t'], ',')
+    sc = scoremod.load(demo_score)
+    after = R.singing(sc, R.clock_for(sc))['parts']['T1']['breaths']
+    assert len(after) == len(before) + 1 and [b for b in after if b not in before][0][1] == 'c'
+
+
+def test_a_breath_mark_keeps_the_notes_other_marks(tmp_path):
+    f = tmp_path / 'm.score'
+    f.write_text('title: x\ntempo: 100\ntime: 4/4\nkey: 0\n\n== 1\nLOW: c3/q>x=Hey d3/q=you r/h\n')
+    fix.breath(str(f), 1, fix.measure(str(f), 1)['staves'][0]['line'], 0, ',')
+    assert "c3/q>x,=Hey" in f.read_text() or "c3/q,>x=Hey" in f.read_text()
+    assert fix.measure(str(f), 1)['staves'][0]['notes'][0]['spoken'] is True
+
+
+@pytest.mark.parametrize('how, t, message', [('!', 0, 'breath'), (',', 2, 'rest')])
+def test_breath_refusals(tmp_path, how, t, message):
+    f = tmp_path / 'm.score'
+    f.write_text('title: x\ntempo: 100\ntime: 4/4\nkey: 0\n\n== 1\nLOW: c3/q=Hey d3/q=you r/h\n')
+    with pytest.raises(fix.Refused, match=message):
+        fix.breath(str(f), 1, fix.measure(str(f), 1)['staves'][0]['line'], t, how)

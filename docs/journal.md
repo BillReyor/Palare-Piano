@@ -2064,3 +2064,20 @@ light, dealt so that the tracks of a piece all differ and neighbours are not adj
 the blush and the smile are mixed for the skin they are on, and the light on the figure's edge
 was raised so that a dark head stands clear of a dark page. The tests now say what the first
 version got wrong: the range must be really deep and really light, and the darker half no token.
+
+**Mouth and breath.** The listener then asked how the figure could remind a choir of two things
+it is always told: the shape of the mouth, and when to breathe - and said that the choir is
+given its breathing measure by measure. So the mouth became a choir's rather than speech's: five
+vowels with a jaw that really drops and lips that come forward for "oh" and "oo"; "ee" kept
+narrow, where the first drawing had it as wide as a grin; a word like "my" held on "ah" and
+turned at the last moment; a final consonant closed where the note stops; more room on a high
+note. A click brings the face close, because at the size it stands beside a track the mouth is
+a dozen dots wide. And it breathes: in the beat before every entrance, in the shape of the vowel
+to come, with the breath mark of printed music beside it; a quick one at a comma in the words;
+and a plain sentence where a stretch runs longer than one breath. All of that is read out of
+the score. What the score cannot know is what a director said, so a breath can now be written
+into the music - a comma after a note for "breathe here", an ampersand for "no breath" - by two
+buttons in the fixer, and the singer follows it. The voices on the tracks do not yet: they still
+breathe only at rests. Trying it showed one thing about the trying itself: a window that is
+behind others is given no frames, so the figure stood still in every photograph until its steps
+were taken by hand.

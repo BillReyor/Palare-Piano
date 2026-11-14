@@ -40,14 +40,25 @@ app.setActivationPolicy(.accessory)
 let cfg = WKWebViewConfiguration()
 cfg.mediaTypesRequiringUserActionForPlayback = .all
 let nav = Nav()
-nav.scripts = args.dropFirst(2).filter { $0 != "show" }.map { try! String(contentsOfFile: $0, encoding: .utf8) }
+nav.scripts = args.dropFirst(2).filter { $0 != "show" && $0 != "see" }.map { try! String(contentsOfFile: $0, encoding: .utf8) }
 cfg.userContentController.add(nav, name: "out")
 let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 860, height: 700), configuration: cfg)
 web.navigationDelegate = nav
 nav.web = web
 let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 860, height: 700), styleMask: [.titled], backing: .buffered, defer: false)
 win.contentView = web
-if args.contains("show") { win.orderFront(nil) }
+// A window behind others is treated as hidden: the page in it is given no frames and its clocks are slowed until a test
+// of a minute takes many.  So this one floats above the rest where nothing can cover it - and, unless "see" is asked
+// for, so faint that it is not in anyone's way.  It takes no clicks and no keys from whoever is at the computer.
+if args.contains("show") || args.contains("see") {
+    win.level = .floating
+    win.ignoresMouseEvents = true
+    if !args.contains("see") { win.alphaValue = 0.02 }
+    if let screen = NSScreen.main { win.setFrameTopLeftPoint(NSPoint(x: screen.visibleFrame.minX + 20, y: screen.visibleFrame.maxY - 20)) }
+    win.orderFrontRegardless()
+}
+let awake = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "trying the page")
+_ = awake
 if args[1].hasPrefix("http") { web.load(URLRequest(url: URL(string: args[1])!)) } else { web.loadHTMLString(try! String(contentsOfFile: args[1], encoding: .utf8), baseURL: URL(string: "http://127.0.0.1/")) }
 DispatchQueue.main.asyncAfter(deadline: .now() + 150) { print("TIMEOUT"); exit(1) }
 app.run()

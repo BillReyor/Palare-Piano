@@ -44,6 +44,10 @@ which catches most misread rhythms. A line that is absent is a bar of rest.
   over the last beat, `x` spoken instead of sung (`eb4/ex=Hey`: the x-shaped notehead of printed
   music). A spoken note is said in rhythm at each singer's own speaking pitch; where it is written
   on the staff only nudges it a little higher or lower.
+  Two marks are for breathing, as a choir is told it measure by measure: `,` is a breath after this
+  note (`d4/h,=night`), and `&` is no breath after it - carry on, whatever a rest or a comma in
+  the words might suggest. The little singer on the page breathes by them; so far they do not
+  change how the voices themselves are sung.
 - **Syllable** after `=`: as printed, hyphen included (`mer-`, `ry`). `=_` continues the previous
   syllable on a new pitch (a slur). A voice with no syllables sings what the other voices sing at
   the same moment - those of its own ensemble first: a trio's voice takes the trio's words, a

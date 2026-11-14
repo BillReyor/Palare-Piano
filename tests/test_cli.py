@@ -172,6 +172,7 @@ def test_measures_flag_also_says_who_sings_when(demo_score):
     r = run(demo_score, '--measures')
     line = next(l for l in r.stdout.splitlines() if l.startswith('singing: '))
     s = json.loads(line[len('singing: '):])
-    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'} and s['all']
-    first = s['parts']['T1'][0]
+    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'} and s['all']['notes']
+    first = s['parts']['T1']['notes'][0]
+    assert s['parts']['T1']['breaths'][0][1] == 'b'                                      # and a breath before it
     assert first[2] == 'o' and first[0] == pytest.approx(1 + 3 * 60 / 66, abs=.02)        # "Oh", on the fourth beat

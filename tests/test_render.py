@@ -300,8 +300,8 @@ def test_sing_keeps_a_stem_per_section(tmp_path, monkeypatch):
     assert np.nanmedian(v) < 52
 
 
-# ---- the little singer on the page: when each part sings, and with what mouth
-SUNG = '''title: x
+# ---- the little singer on the page: when each part sings, with what mouth, and where it breathes
+SUNG = """title: x
 tempo: 60
 time: 4/4
 key: 0
@@ -312,35 +312,96 @@ LOW: c3/h=bum r/h
 == 2
 TEN: c4/h=oh d4/h=_
 LOW: r/w
-'''
+"""
+
+
+def sung(text):
+    sc = scoremod.parse(text, warn=lambda *a: None)
+    return R.singing(sc, R.clock_for(sc))
+
+
+def mouths(part):
+    return [[a, d, m] for a, d, m, *_ in part['notes']]
 
 
 def test_singing_says_when_a_part_sings_and_with_what_mouth():
-    # the page's little singer opens its mouth with the part it sings: wide for "ah", spread for "ee", round for "oo"
-    sc = scoremod.parse(SUNG, warn=lambda *a: None)
-    s = R.singing(sc, R.clock_for(sc))
-    assert s['parts']['T1'] == [[1.0, 1.0, 'a'], [2.0, 1.0, 'e'], [3.0, 1.0, 'o'], [5.0, 2.0, 'o'], [7.0, 2.0, 'o']]     # (a held note keeps its mouth)
-    assert s['parts']['T2'] == s['parts']['T1']
-    assert s['parts']['BS'] == [[1.0, 2.0, 'm']]                    # "bum", hummed on its m: lips together
-    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'}              # only the parts that sing at all
+    # the page's little singer opens its mouth with the part it sings: "ah", "ee", "oo" each have their own
+    s = sung(SUNG)
+    assert mouths(s['parts']['T1']) == [[1.0, 1.0, 'a'], [2.0, 1.0, 'i'], [3.0, 1.0, 'u'], [5.0, 2.0, 'o'], [7.0, 2.0, 'o']]     # (a held note keeps its mouth)
+    assert s['parts']['T2']['notes'] == s['parts']['T1']['notes']
+    assert mouths(s['parts']['BS']) == [[1.0, 2.0, 'm']]             # "bum", hummed on its m: lips together
+    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'}               # only the parts that sing at all
 
 
 def test_singing_of_everyone_is_whoever_is_singing_highest_part_first():
-    sc = scoremod.parse(SUNG.replace('LOW: r/w', 'LOW: c3/w=la').replace('TEN: c4/h=oh d4/h=_', 'TEN: r/h c4/h=oh'), warn=lambda *a: None)
-    s = R.singing(sc, R.clock_for(sc))
+    s = sung(SUNG.replace('LOW: r/w', 'LOW: c3/w=la').replace('TEN: c4/h=oh d4/h=_', 'TEN: r/h c4/h=oh'))
     # measure 2: the basses sing "la" for four beats, the tenors rest two and then sing "oh"
-    assert s['all'][-2:] == [[5.0, 2.0, 'a'], [7.0, 2.0, 'o']]
-    assert s['all'][:3] == [[1.0, 1.0, 'a'], [2.0, 1.0, 'e'], [3.0, 1.0, 'o']]
-    assert all(b >= a and d > 0 for (a, d, _), (b, _, _) in zip(s['all'], s['all'][1:]))       # in order, never backwards
+    assert mouths(s['all'])[-2:] == [[5.0, 2.0, 'a'], [7.0, 2.0, 'o']]
+    assert mouths(s['all'])[:3] == [[1.0, 1.0, 'a'], [2.0, 1.0, 'i'], [3.0, 1.0, 'u']]
+    starts = [n[0] for n in s['all']['notes']]
+    assert starts == sorted(starts)
 
 
-@pytest.mark.parametrize('phonemes, mouth', [('l AA', 'a'), ('k AE t', 'a'), ('AY', 'a'), ('s IY', 'e'), ('b EH d', 'e'), ('ER', 'e'),
-                                             ('y UW', 'o'), ('OW', 'o'), ('g l LO', 'o'), ('s LA ng k', 'a'), ('k LI', 'e'), ('m', 'm'), ('n', 'm'), ('', 'm'), ('b AH + m', 'm'), ('-', None)])
+@pytest.mark.parametrize('phonemes, mouth', [
+    ('l AA', ('a', '', '')), ('k AE t', ('a', '', 't')), ('s IY', ('i', '', '')), ('b EH d', ('e', '', 't')), ('ER', ('e', '', '')),
+    ('y UW', ('u', '', '')), ('g l LO', ('o', '', '')), ('s LA ng k', ('a', '', '')), ('k LI', ('i', '', '')), ('h AO l', ('o', '', 't')),
+    ('m AY', ('a', 'i', '')),            # "my": ah, and ee only at the very end
+    ('n AW', ('a', 'u', '')), ('OW', ('o', 'u', '')), ('d EY z', ('e', 'i', 's')), ('b OY', ('o', 'i', '')),
+    ('k AH m', ('a', '', 'b')),          # "come": the lips close it
+    ('l AH v', ('a', '', 'f')),          # "love": lip to teeth
+    ('m', ('m', '', '')), ('', ('m', '', '')), ('b AH + m', ('m', '', '')), ('-', None),
+])
 def test_mouth_of_a_syllable(phonemes, mouth):
     assert R.mouth(phonemes) == mouth
 
 
-def test_singing_follows_the_tempo(tmp_path):
-    sc = scoremod.parse(SUNG.replace('tempo: 60', 'tempo: 120'), warn=lambda *a: None)
-    s = R.singing(sc, R.clock_for(sc))
-    assert s['parts']['T1'][:2] == [[1.0, 0.5, 'a'], [1.5, 0.5, 'e']]
+def test_singing_follows_the_tempo():
+    assert mouths(sung(SUNG.replace('tempo: 60', 'tempo: 120'))['parts']['T1'])[:2] == [[1.0, 0.5, 'a'], [1.5, 0.5, 'i']]
+
+
+def test_a_diphthong_turns_and_a_consonant_closes_on_the_last_note_of_the_syllable():
+    s = sung(SUNG.replace('TEN: c4/h=oh d4/h=_', 'TEN: c4/h=night d4/h=_'))
+    held, last = s['parts']['T1']['notes'][-2:]
+    assert held[2:5] == ['a', '', ''] and last[2:5] == ['a', 'i', 't']        # "nah...", and "-eet" where the syllable ends
+
+
+def test_how_high_a_note_lies_in_its_part():
+    s = sung(SUNG)
+    assert [n[5] for n in s['parts']['T1']['notes']] == [0.0, 0.5, 1.0, 0.0, 0.5]       # c, d, e of a part that goes from c to e
+
+
+# ---- where to breathe
+def breaths(part):
+    return [[t, kind] for t, kind, *_ in part['breaths']]
+
+
+def test_a_breath_before_every_entrance():
+    s = sung(SUNG)
+    assert breaths(s['parts']['T1']) == [[1.0, 'b'], [5.0, 'b']]         # before the first note, and after the rest
+    first, second = s['parts']['T1']['breaths']
+    assert first[2] == 1.0 and second[2] == 1.0                          # room for it: the second of silence, the beat's rest
+
+
+def test_a_comma_in_the_words_is_a_catch_breath_where_the_syllable_ends():
+    s = sung(SUNG.replace('c4/q=la d4/q=see', 'c4/q=la, d4/q=see'))
+    assert breaths(s['parts']['T1']) == [[1.0, 'b'], [2.0, 'c'], [5.0, 'b']]
+    s = sung(SUNG.replace('TEN: c4/h=oh d4/h=_', 'TEN: c4/q=oh, d4/q=_ e4/h=la'))
+    assert [8.0 - 1, 'c'] in breaths(s['parts']['T1']) and [6.0, 'c'] not in breaths(s['parts']['T1'])     # after the held note, not in the middle of "oh"
+
+
+def test_a_breath_marked_in_the_music_and_a_breath_forbidden():
+    s = sung(SUNG.replace('c4/q=la d4/q=see', 'c4/q,=la d4/q=see'))
+    assert [2.0, 'c'] in breaths(s['parts']['T1'])                       # "," - breathe after this note
+    s = sung(SUNG.replace('c4/q=la d4/q=see', 'c4/q&=la, d4/q=see'))
+    assert [2.0, 'c'] not in breaths(s['parts']['T1'])                   # "&" - no breath, whatever the comma says
+    s = sung(SUNG.replace('e4/q=you r/q', 'e4/q&=you r/q'))
+    assert breaths(s['parts']['T1']) == [[1.0, 'b']]                     # ... or the rest
+
+
+def test_a_long_phrase_with_nowhere_to_breathe_is_one_to_stagger():
+    long = 'title: x\ntempo: 60\ntime: 4/4\nkey: 0\n\n' + ''.join(f'== {m}\nTEN: c4/w={"la" if m == 1 else "_"}\n' for m in range(1, 5))
+    s = sung(long)
+    assert [k for _, k, *_ in s['parts']['T1']['breaths']] == ['b', 's']
+    at, kind, length = s['parts']['T1']['breaths'][1]
+    assert at == 1.0 and length == 16.0                                  # sixteen seconds on one breath: nobody has that
+    assert 's' not in [k for _, k, *_ in sung(SUNG)['parts']['T1']['breaths']]

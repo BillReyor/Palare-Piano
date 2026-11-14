@@ -172,10 +172,24 @@ To work on a hard passage, type its first and last measure after **Repeat measur
 **Repeat**: it plays over and over until you click **Stop repeating**. **Speed** plays any track
 slower, down to half speed, at the same pitch. Nothing has to be made again for either.
 
-A little singer stands beside the track that is playing and sings along: its mouth opens with
-each note of your part, in the shape of the vowel. On the track with your part left out, it shows
-you when to come in. If you would rather not see it, untick **Show the little singer** under
-your pieces.
+A little singer stands beside the track that is playing and sings along, as a reminder of two
+things a choir is always told:
+
+- **The shape of the mouth.** It opens with each note of your part in the shape of the vowel: tall
+  for "ah", lips forward for "oh" and "oo", a narrow "ee". A word like "my" stays on "ah" and
+  turns only at the very end, and a last consonant closes where the note stops. Click the singer
+  for a close look at the mouth; click again to step back.
+- **When to breathe.** Before each entrance it breathes in, and a breath mark (’) appears beside
+  it. A comma in the words is a quick breath. Where a phrase is too long for one breath it says
+  to stagger your breathing.
+
+On the track with your part left out, it shows you when to come in. If you would rather not see
+it, untick **Show the little singer** under your pieces.
+
+**Your director's breaths.** Where you have been told to breathe, or not to, mark it: open **Fix a
+note or a word**, click the note, and choose **Breathe here** or **No breath here** for what
+happens after that note. The singer follows your marks. (They do not change how the voices on the
+tracks are sung.)
 
 ![The finished tracks](docs/pictures/3-tracks.jpg)
 
