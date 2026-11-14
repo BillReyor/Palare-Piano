@@ -130,6 +130,16 @@ Palare Piano is now an app on your computer.
 It opens as a page in your web browser (Safari, Chrome, Edge or whichever you use). It is not a
 website: it is running on your own computer, and it works without the internet.
 
+**The page's address is <http://127.0.0.1:8765>.** If you closed the page, type that into your
+browser to get it back, or keep it as a bookmark. Only this computer can open it.
+
+- It works while Palare Piano is running, and Palare Piano keeps running after you close the page.
+  If your browser says it cannot connect (after the computer was restarted, say), open Palare
+  Piano as described above.
+- If something else on your computer was already using that address, Palare Piano takes the next
+  one: the number at the end is 8766, or the next free one up to 8789. Opening the app always
+  takes you to the right one.
+
 ## Make your first tracks
 
 **1. Add your sheet music.**
@@ -289,7 +299,8 @@ over an hour. Use **Quick listen** when you are in a hurry.
 
 **I closed the page. Where did it go?**
 Open Palare Piano again the same way you opened it before (see
-[Open it next time](#open-it-next-time)). Anything it was making has carried on.
+[Open it next time](#open-it-next-time)), or type <http://127.0.0.1:8765> into your browser.
+Anything it was making has carried on.
 
 **How do I update it?**
 Palare Piano looks for a newer version by itself. (What it offers is the newest version that has

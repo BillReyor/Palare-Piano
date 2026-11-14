@@ -34,6 +34,7 @@ CHANNEL = 'stable'                         # the branch people are given: moved 
 newer = {'checked': 0., 'count': 0, 'news': [], 'error': '', 'updating': False}
 
 lock = threading.RLock()
+PORTS = range(8765, 8790)          # where the page is: http://127.0.0.1:8765, or the next of these that is free (the README gives the address)
 jobs = queue.Queue()
 waiting = []                               # ids of the pieces in the queue, in order
 now = {}                                   # the job being done: id, kind, stage, progress, eta, proc
@@ -941,13 +942,13 @@ def main():
     except Exception:
         pass
     server = None
-    for port in [int(os.environ['PALARE_PORT'])] if os.environ.get('PALARE_PORT') else range(8765, 8790):
+    for port in [int(os.environ['PALARE_PORT'])] if os.environ.get('PALARE_PORT') else PORTS:
         try:
             server = ThreadingHTTPServer(('127.0.0.1', port), Page); break
         except OSError:
             continue
     if server is None:
-        raise SystemExit('No free port between 8765 and 8789 on this computer.')
+        raise SystemExit(f'No free port between {PORTS[0]} and {PORTS[-1]} on this computer.')
     json.dump({'port': port, 'pid': os.getpid()}, open(note, 'w'))
     v = (version() or {}).get('version')
     newer_here = bool(v) and settings().get('version') != v                  # this is the first start of this version here

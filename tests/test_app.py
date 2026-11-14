@@ -660,3 +660,12 @@ def test_the_switch_on_the_page_is_kept_and_tries_the_sound(lib, heard):
     assert app.settings()['ding'] is True and heard == [True]         # switched on: it is played once, to be heard
     app.act('/api/setting', {'something else': 1}, None)
     assert 'something else' not in app.settings()
+
+
+# ---- the page's address
+def test_the_address_in_the_readme_is_where_the_page_is_first_looked_for():
+    # the README tells a singer what to type to get the page back: it has to be the address the program takes
+    readme = open(os.path.join(app.ROOT, 'README.md'), encoding='utf-8').read()
+    assert f'http://127.0.0.1:{app.PORTS[0]}' in readme
+    assert app.PORTS[0] == 8765 and app.PORTS[-1] == 8789          # (and the others it may take, as the README says)
+    assert str(app.PORTS[-1]) in readme
