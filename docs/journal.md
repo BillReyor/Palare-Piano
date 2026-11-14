@@ -2098,3 +2098,11 @@ still peg dolls and still of no gender.
 a string of beads. "The chain should be a metal punk chain, silly." It is now links of steel,
 each through the next, one lying flat and the next on edge, as a chain is; on some a padlock
 closes it at the front.
+
+*The grumpy ones.* They lasted a day. "Maybe the angry faces isn't going to work - they should
+all be happy but have different happy expressions." So the one in five with the drawn-down brows
+is gone, and in their place everybody has one of five ways of being happy, a different one for
+each track of a piece: a small smile; a beam that shows its teeth and lifts the cheeks until
+the eyes are arches; brows high in delight; a cheeky lopsided smile under one cocked brow; and
+eyes shut in plain contentment. The expression stays in the brows and the eyes while the mouth
+is busy singing.

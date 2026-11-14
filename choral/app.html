@@ -320,7 +320,7 @@ function singerPart(file, p, sing) {
 // computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
 // shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
 const SINGER_LOOK = `precision highp float;
-uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2;      // uWho: older, chain (1 a steel chain, 2 with a padlock on it), ear (1 plug, 2 tunnel), grumpy; uWho2: glasses, hair (1 on top, 2 grey at the sides)
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2;      // uWho: older, chain (1 a steel chain, 2 with a padlock on it), ear (1 plug, 2 tunnel), which way of being happy (0 to 4); uWho2: glasses, hair (1 on top, 2 grey at the sides)
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
@@ -407,24 +407,31 @@ vec4 shade(vec2 px) {
     }
     else if (lips(h) < .006) col = mix(skin, vec3(.74, .30, .32), mix(.50, .42, fair));
     else if (h.z > 0.) {
-      float old = uWho.x, grump = uWho.w, ex = abs(h.x) - .19;
+      float old = uWho.x, mood = uWho.w, ex = abs(h.x) - .19;      // everybody is happy, each in their own way: a small smile (0),
+      float beam = step(abs(mood - 1.), .5), wow = step(abs(mood - 2.), .5), cheeky = step(abs(mood - 3.), .5), calm = step(abs(mood - 4.), .5);      // a beam, delight, a cheeky one, contentment
       if (old > .5) {                                                                        // age: lines on the forehead, and under the eyes
         float lines = max(smoothstep(.009, .003, abs(h.y - .30 + .35 * h.x * h.x)), smoothstep(.009, .003, abs(h.y - .365 + .35 * h.x * h.x))) * smoothstep(.24, .16, abs(h.x));
         col = mix(col, col * .62, .55 * max(lines, smoothstep(.008, .003, abs(h.y + .035 - 1.6 * ex * ex)) * smoothstep(.07, .05, abs(ex))));
       }
       vec3 browCol = old > .5 ? mix(vec3(.93), vec3(.55), fair) : uWho2.y > .5 ? uHair * .75 : mix(vec3(.02), vec3(.22, .15, .12), fair);
-      float browY = .19 + ex * (.9 * grump) - .04 * grump - 1.6 * ex * ex * (1. - grump);     // brows: arched, or drawn down in the middle
+      float browY = .19 + .012 * beam + .05 * wow + .045 * cheeky * step(0., h.x) + .006 * calm - (1.6 + 1.4 * wow - .6 * calm) * ex * ex;      // brows: arched; high in delight; one cocked
       col = mix(col, browCol, smoothstep(.012 + .01 * old + .004, .012 + .01 * old - .004, abs(h.y - browY)) * smoothstep(.09, .072, abs(ex)));
       vec2 e = vec2(abs(h.x) - .19, h.y - .075);                                           // the eyes: dark, with a light in each
-      float eye = length(e / vec2(.062, .082 * (1. + .18 * uIn)));                         // ... or shut, as a happy curve
-      float lid = smoothstep(.016, .008, abs(e.y - .012 + 4.5 * e.x * e.x)) * smoothstep(.07, .055, abs(e.x));
-      float under = mix(1., smoothstep(.005, -.012, e.y - (.022 + .38 * e.x)), grump);            // a grumpy lid, low over the eye
-      col = mix(col, vec3(.07, .05, .09), mix(smoothstep(1.05, .9, eye) * under, lid, uBlink));
-      col = mix(col, vec3(1.), smoothstep(.028, .018, length(e - vec2(-.02 * sign(h.x) + .012, mix(.03, .0, grump)))) * (1. - uBlink));
-      col = mix(col, mix(vec3(.72, .22, .20), vec3(1., .60, .60), fair), mix(.38, .55, fair) * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks, warm on every skin
+      float eye = length(e / (vec2(.062, .082 * (1. + .18 * uIn)) * (1. + .13 * wow)));    // ... wide in delight; or shut, as a happy curve
+      float lid = smoothstep(.020, .010, abs(e.y - .012 + 4.5 * e.x * e.x)) * smoothstep(.072, .056, abs(e.x));
+      float under = mix(1., smoothstep(-.008, .008, e.y - (-.05 + .058 * (1. - e.x * e.x / .0038))), beam);      // a beam lifts the cheeks, and the eyes become arches
+      float shutEye = max(uBlink, calm);                                                    // contentment keeps them shut
+      col = mix(col, vec3(.07, .05, .09), mix(smoothstep(1.05, .9, eye) * under, lid, shutEye));
+      col = mix(col, vec3(1.), smoothstep(.028, .018, length(e - vec2(-.02 * sign(h.x) + .012, .03 + .012 * beam))) * (1. - shutEye));
+      col = mix(col, mix(vec3(.72, .22, .20), vec3(1., .60, .60), fair), (mix(.38, .55, fair) + .16 * beam) * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks, warm on every skin
       float shut = 1. - smoothstep(.012, .03, ms.y);                                       // a small smile while the mouth is shut
-      float line = abs(h.y - mix(-.195 + 2.2 * h.x * h.x, -.172 - 2.4 * h.x * h.x, grump));      // ... or, on the grumpy, the other way up
-      col = mix(col, mix(uSkin * .32, vec3(.42, .20, .22), fair), shut * smoothstep(.017, .009, line) * smoothstep(.10, .08, abs(h.x)));
+      float wide = .09 + .045 * beam + .012 * wow + .012 * cheeky - .018 * calm;           // ... each smile its own: broad, deep, lopsided, or slight
+      float curve = -.195 - .045 * beam + (2.2 + 1.4 * beam + 1.3 * wow - .5 * calm) * h.x * h.x + .15 * cheeky * h.x;
+      vec3 ink = mix(uSkin * .32, vec3(.42, .20, .22), fair);
+      float top = -.183 + .5 * h.x * h.x, within = smoothstep(wide + .012, wide - .008, abs(h.x));
+      float grin = beam * smoothstep(-.006, .006, h.y - curve) * smoothstep(.006, -.006, h.y - top) * within;      // a beam shows its teeth
+      col = mix(col, vec3(.98, .97, .94), shut * grin);
+      col = mix(col, ink, shut * max(smoothstep(.019, .010, abs(h.y - curve)), beam * smoothstep(.013, .007, abs(h.y - top))) * within);
     }
   }
   else if (d.y < 3.5) col = vec3(.98);
@@ -463,7 +470,8 @@ function singerTone(pid, index) { let h = 0; for (const ch of String(pid)) h = (
 // A chorus is not made of one person.  Besides a skin tone, each track's singer is somebody: older (grey at the temples,
 // bushy brows, lines on the forehead) or not; with a punk's thick steel chain (a padlock on some), or without; with plugs or tunnels
 // in stretched ear lobes, or neither; in glasses or not; bald, or with hair - dyed, as likely as not, on the one
-// with the plugs; and now and then grumpy, which does not stop anybody singing.  Each trait takes its own turn round
+// with the plugs.  And everybody is happy, each in their own way (mood): a small smile, a beam that shows its teeth and
+// lifts the cheeks, brows up in delight, a cheeky lopsided one with a cocked brow, eyes shut in contentment.  Each trait takes its own turn round
 // the tracks of a piece, so that among any five of them there is some of everybody and no two are alike.
 const HAIRS = [[.12, .09, .08], [.32, .2, .12], [.62, .44, .2], [.5, .2, .1], [.95, .35, .62], [.25, .55, .92], [.3, .75, .5]];
 function singerLook(pid, index) {
@@ -471,7 +479,7 @@ function singerLook(pid, index) {
   const i = Math.max(0, index), turn = (shift, n) => (((h >>> shift) % n) + i) % n, kind = shift => 1 + ((i >> 2) + (h >>> shift)) % 2;
   const old = [1, 3].includes(turn(0, 5)), plug = turn(8, 4) === 1 ? kind(9) : 0, punk = !!plug && !old;
   const hair = old ? (turn(11, 3) === 0 ? 0 : 2) : punk || turn(13, 3) !== 0 ? 1 : 0;
-  return { tone: singerTone(pid, index), old: old ? 1 : 0, chain: turn(5, 4) === 0 ? kind(7) : 0, plug, grump: turn(3, 5) === 2 ? 1 : 0,
+  return { tone: singerTone(pid, index), old: old ? 1 : 0, chain: turn(5, 4) === 0 ? kind(7) : 0, plug, mood: turn(3, 5),
     specs: (old ? turn(15, 2) === 0 : turn(17, 5) === 0) ? 1 : 0, hair,
     hairCol: old ? (turn(19, 2) ? [.84, .84, .86] : [.95, .95, .95]) : HAIRS[punk ? 4 + ((h >>> 4) + i) % 3 : ((h >>> 4) + i) % 4] };
 }
@@ -479,7 +487,7 @@ const singer = {
   on: (() => { try { return localStorage.getItem('palare-singer') !== '0'; } catch (e) { return true; } })(),
   still: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
   s: { open: 0, wide: .45, tall: 0, round: 0, jaw: 0, teeth: 0, tongue: 0, blink: 0, bounce: 0, sway: 0, breath: 0, inn: 0, zoom: 0, lively: 0 },
-  tint: [.42, .18, .63], skin: TONES[3], who: { old: 0, chain: 0, plug: 0, grump: 0, specs: 0, hair: 0, hairCol: [.1, .1, .1] }, running: false, big: false,
+  tint: [.42, .18, .63], skin: TONES[3], who: { old: 0, chain: 0, plug: 0, mood: 0, specs: 0, hair: 0, hairCol: [.1, .1, .1] }, running: false, big: false,
   make() {                                           // once: the picture, and the lines that draw it
     if (this.canvas !== undefined) return this.gl;
     const c = this.canvas = document.createElement('canvas');
@@ -513,7 +521,7 @@ const singer = {
     gl.uniform1f(at.uTeeth, s.teeth); gl.uniform1f(at.uTongue, s.tongue); gl.uniform1f(at.uBlink, s.blink); gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway);
     gl.uniform1f(at.uBreath, s.breath); gl.uniform1f(at.uIn, s.inn); gl.uniform1f(at.uZoom, s.zoom);
     gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]); gl.uniform3f(at.uSkin, this.skin[0], this.skin[1], this.skin[2]);
-    const w = this.who; gl.uniform3f(at.uHair, w.hairCol[0], w.hairCol[1], w.hairCol[2]); gl.uniform4f(at.uWho, w.old, w.chain, w.plug, w.grump); gl.uniform4f(at.uWho2, w.specs, w.hair, 0, 0);
+    const w = this.who; gl.uniform3f(at.uHair, w.hairCol[0], w.hairCol[1], w.hairCol[2]); gl.uniform4f(at.uWho, w.old, w.chain, w.plug, w.mood); gl.uniform4f(at.uWho2, w.specs, w.hair, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   },
   step(dt, now) {                                    // one moment on: towards what the track is doing
@@ -533,7 +541,7 @@ const singer = {
     s.sway = this.still ? 0 : Math.sin(now * 1.7) * .5 * s.lively; s.breath = this.still ? 0 : Math.sin(now * 1.1);
     s.zoom = to(s.zoom, this.big ? 1 : 0, this.still ? .001 : .12);
     if (now > (this.blinkAt || 0)) { this.blinkAt = now + 2.5 + Math.random() * 3; this.blinkFrom = now; }
-    this.bliss = to(this.bliss || 0, mouth && !fill && !this.who.grump && 'aeiou'.includes(mouth) && since > 1.1 && open > .9 ? 1 : 0, .12);      // a long note: eyes shut, happily
+    this.bliss = to(this.bliss || 0, mouth && !fill && 'aeiou'.includes(mouth) && since > 1.1 && open > .9 ? 1 : 0, .12);      // a long note: eyes shut, happily
     s.blink = Math.max(now - (this.blinkFrom || -9) < .13 ? 1 : 0, this.bliss > .5 ? 1 : 0);
     const mark = fill > 0, word = mark ? (kind === 'c' ? 'quick breath' : 'breathe') : stagger ? 'stagger your breathing' : this.big && mouth && SAYS[mouth] && open > .3 ? SAYS[mouth] : '';
     if (mark !== this.marked) { this.marked = mark; this.mark.classList.toggle('on', mark); }

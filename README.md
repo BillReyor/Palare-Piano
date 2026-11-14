@@ -185,7 +185,7 @@ things a choir is always told:
 
 On the track with your part left out, it shows you when to come in. Each track has its own singer,
 and they are not all alike: young and older, every skin tone, some in glasses, some with a thick
-chain or with plugs in their ears, and now and then a grumpy one. If you would rather not see
+chain or with plugs in their ears, and each happy in their own way. If you would rather not see
 them, untick **Show the little singer** under your pieces.
 
 **Your director's breaths.** Where you have been told to breathe, or not to, mark it: open **Fix a

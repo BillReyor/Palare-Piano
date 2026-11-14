@@ -317,14 +317,15 @@ def test_a_long_stretch_is_one_to_stagger_the_breathing_in():
 
 # ---- a chorus is not made of one person: who each singer is
 # Asked for by a listener, as a truer picture of the chorus: some of the singers older, some with a thick chain or
-# with plugs or tunnels in stretched ear lobes, some of them grumpy.
+# with plugs or tunnels in stretched ear lobes.  (Some were grumpy, for a day: "they should all be happy but have
+# different happy expressions".)
 def look(pid, i):
     return js(f'singerLook({json.dumps(pid)}, {i})', 'singerLook', 'singerTone', consts=['TONES', 'HAIRS'])
 
 
 def test_a_singers_look_says_who_they_are():
     one = look('My Song', 0)
-    assert set(one) >= {'tone', 'old', 'chain', 'plug', 'grump', 'specs', 'hair', 'hairCol'}
+    assert set(one) >= {'tone', 'old', 'chain', 'plug', 'mood', 'specs', 'hair', 'hairCol'} and 'grump' not in one
     assert one == look('My Song', 0)                               # and they stay who they are
     assert one['tone'] == js('singerTone("My Song", 0)', 'singerTone', consts=['TONES'])
 
@@ -335,14 +336,15 @@ def test_among_the_tracks_of_one_piece_there_is_some_of_everybody(piece):
     assert any(s['old'] for s in five) and not all(s['old'] for s in five)
     assert any(s['chain'] for s in five) and not all(s['chain'] for s in five)
     assert any(s['plug'] for s in five) and not all(s['plug'] for s in five)
-    assert 1 <= sum(1 for s in five if s['grump']) <= 2            # somebody is grumpy; most are not
+    assert sorted(s['mood'] for s in five) == [0, 1, 2, 3, 4]      # five ways of being happy, one each
     assert len({json.dumps(s, sort_keys=True) for s in five}) == 5 # and no two of them are the same person
 
 
 def test_in_a_whole_chorus_set_the_mix_is_a_mix():
     twenty = [look('My Song', i) for i in range(20)]               # five tracks for each of four parts
     count = lambda k: sum(1 for s in twenty if s[k])
-    assert 6 <= count('old') <= 10 and 4 <= count('chain') <= 8 and 4 <= count('plug') <= 8 and 3 <= count('grump') <= 6
+    assert 6 <= count('old') <= 10 and 4 <= count('chain') <= 8 and 4 <= count('plug') <= 8
+    assert all(sum(1 for s in twenty if s['mood'] == m) == 4 for m in range(5))
     assert {s['plug'] for s in twenty} >= {0, 1, 2}                # plugs, and tunnels, and neither
     assert {s['chain'] for s in twenty} >= {0, 1, 2}               # gold, and silver
     assert all(s['hair'] == 2 for s in twenty if s['old']) or any(s['hair'] != 2 for s in twenty if s['old'])
@@ -362,3 +364,10 @@ def test_the_chain_is_a_punks_steel_chain_of_links():
     # the first chain came out as a string of gold beads, and was laughed at: it is steel links, each through the next
     look = HTML[HTML.index('const SINGER_LOOK'):HTML.index('const MOUTHS')]
     assert 'float link(' in look and 'gold' not in look.lower() and 'padlock' in look
+
+
+def test_everybody_is_happy_each_in_their_own_way():
+    # nobody on the page is cross: no drawn-down brows, no mouth turned the other way
+    assert 'grump' not in HTML.lower() and 'frown' not in HTML.lower()
+    look = HTML[HTML.index('const SINGER_LOOK'):HTML.index('const MOUTHS')]
+    assert 'mood' in look
