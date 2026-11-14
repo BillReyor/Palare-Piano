@@ -2088,8 +2088,13 @@ should look grumpy - "a more natural reflection of the chorus". A figure meant t
 particular had come out as the same person seven times in different skin. Each track's singer
 is now somebody: grey at the temples with bushy white brows and a lined forehead, or young;
 in round glasses or not; bald, or with hair that on the one with plugs is as likely pink or
-blue as brown; a chunky chain in gold or silver over the collar; and one in five with the
+blue as brown; a thick steel chain over the collar; and one in five with the
 brows drawn down and the mouth turned the other way, who sings every note all the same and
 does not close their eyes in bliss on the long ones. Each trait takes its own turn round the
 tracks of a piece, so that any five tracks show some of everybody and no two alike. They are
 still peg dolls and still of no gender.
+
+*The chain.* It was first drawn as a ring with lumps on it, in gold or silver, and came out as
+a string of beads. "The chain should be a metal punk chain, silly." It is now links of steel,
+each through the next, one lying flat and the next on edge, as a chain is; on some a padlock
+closes it at the front.

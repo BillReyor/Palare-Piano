@@ -320,7 +320,7 @@ function singerPart(file, p, sing) {
 // computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
 // shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
 const SINGER_LOOK = `precision highp float;
-uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2;      // uWho: older, chain (1 gold, 2 silver), ear (1 plug, 2 tunnel), grumpy; uWho2: glasses, hair (1 on top, 2 grey at the sides)
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uRound, uJaw, uTeeth, uTongue, uBlink, uBounce, uSway, uBreath, uIn, uZoom; uniform vec3 uTint, uSkin, uHair; uniform vec4 uWho, uWho2;      // uWho: older, chain (1 a steel chain, 2 with a padlock on it), ear (1 plug, 2 tunnel), grumpy; uWho2: glasses, hair (1 on top, 2 grey at the sides)
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
@@ -340,8 +340,18 @@ float lips(vec3 h) {                                                          //
 float ears(vec3 h) { vec3 e = vec3(abs(h.x) - .535, h.y + .01, h.z + .03); e.z -= e.x * .7; return ellipsoid(e, vec3(.05, .115, .085)); }      // they stand out a little
 vec2 lobe(vec3 h) { vec3 q = vec3(abs(h.x) - .568, h.y + .09, h.z - .0), a = normalize(vec3(.70, 0., .71)); float al = dot(q, a); return vec2(length(q - a * al), al); }      // across a lobe, and through it
 float plug(vec3 h) { vec2 q = lobe(h); float d = max(q.x - .064, abs(q.y) - .032); return uWho.z > 1.5 ? max(d, -(q.x - .038)) : d; }      // a plug, or a tunnel one can see through
-float chain(vec3 p) { vec3 q = p - vec3(0., .0 + lift(), 0.); float c = cos(.36), s = sin(.36); q = vec3(q.x, c * q.y + s * q.z, -s * q.y + c * q.z);      // it hangs low in front
-  return length(vec2(length(q.xz) - .41, q.y)) - (.036 + .016 * abs(sin(atan(q.x, q.z) * 11.))); }
+float link(vec3 p, float le, float r1, float r2) { vec3 q = vec3(p.x, max(abs(p.y) - le, 0.), p.z); return length(vec2(length(q.xy) - r1, q.z)) - r2; }      // one link of a chain
+float chain(vec3 p) {                                // a punk's chain: steel links, each through the next - one lying flat, the next on edge
+  vec3 q = p - vec3(0., lift(), 0.); float c = cos(.36), s = sin(.36); q = vec3(q.x, c * q.y + s * q.z, -s * q.y + c * q.z);      // it hangs low in front
+  float R = .415, sector = 6.2832 / 14., ang = atan(q.x, q.z), k0 = floor(ang / sector + .5), r = length(q.xz) - R, d = 9.;
+  for (int j = -1; j <= 1; j++) { float k = k0 + float(j), u = (ang - k * sector) * R; d = min(d, link(mod(k + 28., 2.) < .5 ? vec3(q.y, u, r) : vec3(r, u, q.y), .060, .046, .019)); }
+  return d;
+}
+float padlock(vec3 p) {                              // ... and on some, a padlock closes it at the front, where a pendant would hang
+  vec3 q = p - vec3(0., lift(), 0.); float c = cos(.36), s = sin(.36); q = vec3(q.x, c * q.y + s * q.z, -s * q.y + c * q.z);
+  vec3 b = q - vec3(0., -.05, .415 + .045);
+  return min(box(b, vec3(.05, .042, .022), .014), length(vec2(length(b.xy - vec2(0., .052)) - .034, b.z)) - .012);
+}
 float glasses(vec3 h) { vec3 q = vec3(abs(h.x) - .19, h.y - .075, h.z - .487);
   return min(length(vec2(length(q.xy) - .108, q.z)) - .013, max(length(vec2(h.y - .09, h.z - .505)) - .011, abs(h.x) - .085)); }
 float hair(vec3 h) { float cap = ellipsoid(h, vec3(.578, .538, .548));
@@ -365,6 +375,7 @@ vec2 scene(vec3 p) {                                 // -> (distance to the near
   if (hands < d.x) d = vec2(hands, 4.);
   if (folder < d.x) d = vec2(folder, 5.);
   if (uWho.y > .5) { float x = chain(p); if (x < d.x) d = vec2(x, 6.); }
+  if (uWho.y > 1.5) { float x = padlock(p); if (x < d.x) d = vec2(x, 10.); }
   if (uWho.z > .5) { float x = plug(h); if (x < d.x) d = vec2(x, 7.); }
   if (uWho2.x > .5) { float x = glasses(h); if (x < d.x) d = vec2(x, 8.); }
   if (uWho2.y > .5) { float x = hair(h); if (x < d.x) d = vec2(x, 9.); }
@@ -419,15 +430,16 @@ vec4 shade(vec2 px) {
   else if (d.y < 3.5) col = vec3(.98);
   else if (d.y < 4.5) col = skin;
   else if (d.y < 5.5) col = vec3(.16, .14, .22);
-  else if (d.y < 6.5) col = uWho.y > 1.5 ? vec3(.80, .82, .86) : vec3(.98, .76, .22);        // a chain: silver, or gold
+  else if (d.y < 6.5) col = vec3(.70, .72, .77);                                              // the chain: steel
   else if (d.y < 7.5) col = uWho.z > 1.5 ? vec3(.62, .64, .68) : vec3(.07, .07, .09);        // a steel tunnel, a black plug
   else if (d.y < 8.5) col = vec3(.10, .09, .12);                                              // glasses
-  else col = uHair;
+  else if (d.y < 9.5) col = uHair;
+  else col = vec3(.30, .31, .35);                                                             // the padlock: darker than its chain
   vec3 l = normalize(vec3(-.45, .8, .65));
   float dif = pow(.5 + .5 * dot(n, l), 1.6), ao = 1.;
   for (int i = 1; i <= 4; i++) { float s = .06 * float(i); ao -= (s - scene(p + n * s).x) * .9 / float(i); }
   float rim = pow(1. - max(dot(n, -rd), 0.), 3.);
-  float shine = d.y > 5.5 && d.y < 7.5 ? .75 : .10;                                           // metal catches the light
+  float shine = (d.y > 5.5 && d.y < 7.5) || d.y > 9.5 ? .75 : .10;                                           // metal catches the light
   vec3 lit = col * (.38 + .74 * dif) * clamp(ao, .45, 1.) + rim * .22 + pow(max(dot(reflect(rd, n), l), 0.), 28.) * shine;      // (the light on its edge keeps a dark head clear of a dark page)
   return vec4(pow(clamp(lit, 0., 1.), vec3(.92)), 1.);
 }
@@ -449,7 +461,7 @@ const TONES = [[.25, .15, .11], [.36, .23, .16], [.50, .32, .22], [.63, .42, .29
 // a track keeps its singer, and pieces do not all begin with the same one.
 function singerTone(pid, index) { let h = 0; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return (h + Math.max(0, index) * 3) % TONES.length; }
 // A chorus is not made of one person.  Besides a skin tone, each track's singer is somebody: older (grey at the temples,
-// bushy brows, lines on the forehead) or not; with a thick chain, gold or silver, or without; with plugs or tunnels
+// bushy brows, lines on the forehead) or not; with a punk's thick steel chain (a padlock on some), or without; with plugs or tunnels
 // in stretched ear lobes, or neither; in glasses or not; bald, or with hair - dyed, as likely as not, on the one
 // with the plugs; and now and then grumpy, which does not stop anybody singing.  Each trait takes its own turn round
 // the tracks of a piece, so that among any five of them there is some of everybody and no two are alike.

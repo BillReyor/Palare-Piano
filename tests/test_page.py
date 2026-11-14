@@ -356,3 +356,9 @@ def test_grey_hair_goes_with_age_and_any_colour_with_youth():
         if s['old'] and s['hair']:
             r, g, b = s['hairCol']
             assert abs(r - g) < .08 and abs(g - b) < .08 and r > .6    # grey or white
+
+
+def test_the_chain_is_a_punks_steel_chain_of_links():
+    # the first chain came out as a string of gold beads, and was laughed at: it is steel links, each through the next
+    look = HTML[HTML.index('const SINGER_LOOK'):HTML.index('const MOUTHS')]
+    assert 'float link(' in look and 'gold' not in look.lower() and 'padlock' in look
