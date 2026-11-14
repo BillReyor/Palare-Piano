@@ -225,3 +225,38 @@ PIECE = {'read': {'parts': [['tenor1', 'Tenor 1'], ['baritone', 'Baritone'], ['b
 ])
 def test_the_singer_sings_the_part_the_track_is_for(file, piece, part):
     assert js(f'singerPart({json.dumps(file)}, {json.dumps(piece)}, {json.dumps(SING)})', 'singerPart') == part
+
+
+# ---- the singers are not all one colour
+# The first figure had a single cream head and hands, meant as "neutral".  A listener asked why all the little
+# people were white - which is what one pale tone for everybody is.  Each track's singer now has a skin tone of
+# its own, from a range that runs from deep brown to light.
+def tones():
+    return js('TONES', consts=['TONES'])
+
+
+def brightness(rgb):
+    return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2]
+
+
+def test_the_singers_skin_tones_run_from_deep_to_light():
+    t = tones()
+    assert len(t) >= 6
+    light = [brightness(c) for c in t]
+    assert min(light) < .25 and max(light) > .75                   # really deep, and really light
+    assert sum(b < .5 for b in light) >= len(t) // 2               # and the darker half is not a token one
+    assert all(c[0] > c[1] > c[2] for c in t)                      # skin: warm, every one of them
+
+
+def test_the_tracks_of_a_piece_have_singers_of_different_tones():
+    n = len(tones())
+    got = [js(f'singerTone("My Song", {i})', 'singerTone', consts=['TONES']) for i in range(n)]
+    assert sorted(got) == list(range(n))                           # as many different singers as there are tones
+    assert all(abs(a - b) > 1 for a, b in zip(got, got[1:]))       # and the track below is not the next shade along
+
+
+def test_a_singer_keeps_its_tone_and_pieces_do_not_all_begin_alike():
+    assert js('singerTone("My Song", 2)', 'singerTone', consts=['TONES']) == js('singerTone("My Song", 2)', 'singerTone', consts=['TONES'])
+    firsts = {js(f'singerTone({json.dumps(name)}, 0)', 'singerTone', consts=['TONES']) for name in ('My Song', 'Another', 'A Third One', 'Fourth', 'The Fifth Piece', 'Six')}
+    assert len(firsts) >= 3
+    assert js('singerTone("My Song", -1)', 'singerTone', consts=['TONES']) in range(len(tones()))       # a track it cannot place still gets one

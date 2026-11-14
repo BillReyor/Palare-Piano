@@ -292,7 +292,7 @@ function singerPart(file, p, sing) {
 // computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
 // shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
 const SINGER_LOOK = `precision highp float;
-uniform vec2 uRes; uniform float uOpen, uWide, uTall, uBlink, uBounce, uSway, uBreath; uniform vec3 uTint;
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uBlink, uBounce, uSway, uBreath; uniform vec3 uTint, uSkin;
 float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
 float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
 float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
@@ -330,7 +330,7 @@ vec4 shade(vec2 px) {
     return vec4(0., 0., 0., sh);
   }
   vec3 p = ro + rd * t, n = normalAt(p), h = inHead(p), col;
-  vec3 cream = vec3(1., .93, .84), robe = uTint;
+  vec3 cream = uSkin, robe = uTint; float fair = dot(uSkin, vec3(.2126, .7152, .0722));      // the singer's own skin, and how light it is
   if (d.y < 1.5) col = robe * (.82 + .18 * smoothstep(-.9, .1, p.y));
   else if (d.y < 2.5) {
     col = cream;
@@ -340,12 +340,12 @@ vec4 shade(vec2 px) {
       vec2 e = vec2(abs(h.x) - .19, h.y - .075);                                           // the eyes: dark, with a light in each
       float eye = length(e / vec2(.062, .082));                                           // ... or shut, as a happy curve
       float lid = smoothstep(.016, .008, abs(e.y - .012 + 4.5 * e.x * e.x)) * smoothstep(.07, .055, abs(e.x));
-      col = mix(col, vec3(.13, .10, .16), mix(smoothstep(1.05, .9, eye), lid, uBlink));
+      col = mix(col, vec3(.07, .05, .09), mix(smoothstep(1.05, .9, eye), lid, uBlink));
       col = mix(col, vec3(1.), smoothstep(.028, .018, length(e - vec2(-.02 * sign(h.x) + .012, .03))) * (1. - uBlink));
-      col = mix(col, vec3(1., .62, .62), .55 * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks
+      col = mix(col, mix(vec3(.72, .22, .20), vec3(1., .60, .60), fair), mix(.38, .55, fair) * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks, warm on every skin
       float shut = 1. - smoothstep(.012, .03, mouthSize().y);                               // a small smile while the mouth is shut
       float line = abs(h.y + .195 - 2.2 * h.x * h.x);
-      col = mix(col, vec3(.42, .20, .22), shut * smoothstep(.017, .009, line) * smoothstep(.10, .08, abs(h.x)));
+      col = mix(col, mix(uSkin * .32, vec3(.42, .20, .22), fair), shut * smoothstep(.017, .009, line) * smoothstep(.10, .08, abs(h.x)));
     }
   }
   else if (d.y < 3.5) col = vec3(.98);
@@ -355,7 +355,7 @@ vec4 shade(vec2 px) {
   float dif = pow(.5 + .5 * dot(n, l), 1.6), ao = 1.;
   for (int i = 1; i <= 4; i++) { float s = .06 * float(i); ao -= (s - scene(p + n * s).x) * .9 / float(i); }
   float rim = pow(1. - max(dot(n, -rd), 0.), 3.);
-  vec3 lit = col * (.38 + .74 * dif) * clamp(ao, .45, 1.) + rim * .16 + pow(max(dot(reflect(rd, n), l), 0.), 28.) * .10;
+  vec3 lit = col * (.38 + .74 * dif) * clamp(ao, .45, 1.) + rim * .22 + pow(max(dot(reflect(rd, n), l), 0.), 28.) * .10;      // (the light on its edge keeps a dark head clear of a dark page)
   return vec4(pow(clamp(lit, 0., 1.), vec3(.92)), 1.);
 }
 void main() {
@@ -364,10 +364,16 @@ void main() {
   gl_FragColor = c * .25;                            // (colour already multiplied by how solid it is, as the page expects)
 }`;
 const MOUTHS = { a: [.62, 1], e: [1, .5], o: [.2, .52], m: [.45, 0] };          // each vowel's mouth: how wide, how tall
+// The singers are not all one colour.  The first figure had one cream head for everybody, meant as "neutral" - and a
+// listener asked why all the little people were white.  Skin tones, deep to light: each track's singer has its own.
+const TONES = [[.25, .15, .11], [.36, .23, .16], [.50, .32, .22], [.63, .42, .29], [.76, .55, .40], [.87, .69, .54], [.96, .83, .71]];
+// Which tone the singer of a track has: a piece's tracks all differ (and the track below is not the next shade along),
+// a track keeps its singer, and pieces do not all begin with the same one.
+function singerTone(pid, index) { let h = 0; for (const ch of String(pid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return (h + Math.max(0, index) * 3) % TONES.length; }
 const singer = {
   on: (() => { try { return localStorage.getItem('palare-singer') !== '0'; } catch (e) { return true; } })(),
   still: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
-  s: { open: 0, wide: .45, tall: 0, blink: 0, bounce: 0, sway: 0, breath: 0, lively: 0 }, tint: [.42, .18, .63], running: false,
+  s: { open: 0, wide: .45, tall: 0, blink: 0, bounce: 0, sway: 0, breath: 0, lively: 0 }, tint: [.42, .18, .63], skin: TONES[3], running: false,
   make() {                                           // once: the picture, and the lines that draw it
     if (this.canvas !== undefined) return this.gl;
     const c = this.canvas = document.createElement('canvas'); c.className = 'singer'; c.setAttribute('aria-hidden', 'true');
@@ -381,7 +387,7 @@ const singer = {
       if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
       gl.useProgram(pr); gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0); gl.bindAttribLocation(pr, 0, 'p'); gl.vertexAttribPointer(gl.getAttribLocation(pr, 'p'), 2, gl.FLOAT, false, 0, 0);
-      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uTint'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
+      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uTint', 'uSkin'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
     } catch (e) { this.gl = null; this.why = String(e.message || e); }
     return this.gl;
   },
@@ -389,7 +395,7 @@ const singer = {
     const gl = this.gl, s = this.s, at = this.at; if (!gl) return;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height); gl.uniform2f(at.uRes, this.canvas.width, this.canvas.height);
     gl.uniform1f(at.uOpen, s.open); gl.uniform1f(at.uWide, s.wide); gl.uniform1f(at.uTall, s.tall); gl.uniform1f(at.uBlink, s.blink);
-    gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway); gl.uniform1f(at.uBreath, s.breath); gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]);
+    gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway); gl.uniform1f(at.uBreath, s.breath); gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]); gl.uniform3f(at.uSkin, this.skin[0], this.skin[1], this.skin[2]);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   },
   step(dt, now) {                                    // one moment on: towards what the track is doing
@@ -417,6 +423,7 @@ const singer = {
     document.querySelectorAll('.track.with-singer').forEach(x => { if (x !== node) x.classList.remove('with-singer'); });
     if (this.canvas.parentNode !== node) node.prepend(this.canvas); node.classList.add('with-singer');
     const m = /^#(..)(..)(..)$/.exec(tint || ''); this.tint = m ? m.slice(1).map(x => parseInt(x, 16) / 255) : [.42, .18, .63];
+    this.skin = TONES[singerTone(p.id, (p.tracks || []).indexOf(f))];
     this.audio = audio; this.notes = null; this.since = 9;
     const use = sing => { if (this.audio === audio && sing && sing.parts) { const k = singerPart(f, p, sing); this.notes = k === 'all' ? sing.all : sing.parts[k]; } };
     if (SING[p.id]) use(SING[p.id]); else post('/api/singing', { id: p.id }).then(j => { SING[p.id] = j; use(j); }).catch(() => {});

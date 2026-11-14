@@ -2055,3 +2055,12 @@ with a part left out it sings that part, which shows the singer at the computer 
 in. It was looked at as it was built - drawn in Safari's own engine, pose by pose, and
 photographed on the page - which is how the robe was found to end below the floor and the
 resting mouth to be a slit where a smile was meant.
+
+*And then:* "why are all the little 3D people white?" Because the head and hands had been given
+one cream colour, chosen as "neutral" - and one pale tone for everybody is not neutral, it is
+white. Nobody building it had looked at it with that question; the listener did at first sight.
+Each track's singer now has a skin tone of its own, from seven that run from deep brown to
+light, dealt so that the tracks of a piece all differ and neighbours are not adjacent shades;
+the blush and the smile are mixed for the skin they are on, and the light on the figure's edge
+was raised so that a dark head stands clear of a dark page. The tests now say what the first
+version got wrong: the range must be really deep and really light, and the darker half no token.
