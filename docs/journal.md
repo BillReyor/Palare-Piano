@@ -2118,5 +2118,5 @@ rest of the combinations were the ordinary differences of any roomful of singers
 moustache (grey on the older ones, and its own colour under a dyed mohawk); eye shadow, a wing
 at the corner of the eye and lipstick, with or without a beard; freckles; an afro, long hair, a
 bun; a hearing aid behind one ear; a wheelchair. Each takes its own turn round the tracks, and
-they combine as they fall. Looked at twenty at a time, and five close up. Not drawn, and for
-the listener to say: what people wear on their heads for their faith.
+they combine as they fall. Looked at twenty at a time, and five close up. Not drawn: what people wear on their heads for their faith. That was put to the listener,
+who said to leave it out.
