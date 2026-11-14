@@ -2081,3 +2081,15 @@ buttons in the fixer, and the singer follows it. The voices on the tracks do not
 breathe only at rests. Trying it showed one thing about the trying itself: a window that is
 behind others is given no frames, so the figure stood still in every photograph until its steps
 were taken by hand.
+
+**A chorus, not a singer.** The listener once more, on seeing the figures side by side: some
+should be older; some should wear a thick chain, or the plugs of stretched ear lobes; some
+should look grumpy - "a more natural reflection of the chorus". A figure meant to be nobody in
+particular had come out as the same person seven times in different skin. Each track's singer
+is now somebody: grey at the temples with bushy white brows and a lined forehead, or young;
+in round glasses or not; bald, or with hair that on the one with plugs is as likely pink or
+blue as brown; a chunky chain in gold or silver over the collar; and one in five with the
+brows drawn down and the mouth turned the other way, who sings every note all the same and
+does not close their eyes in bliss on the long ones. Each trait takes its own turn round the
+tracks of a piece, so that any five tracks show some of everybody and no two alike. They are
+still peg dolls and still of no gender.

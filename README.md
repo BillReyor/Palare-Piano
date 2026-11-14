@@ -183,8 +183,10 @@ things a choir is always told:
   it. A comma in the words is a quick breath. Where a phrase is too long for one breath it says
   to stagger your breathing.
 
-On the track with your part left out, it shows you when to come in. If you would rather not see
-it, untick **Show the little singer** under your pieces.
+On the track with your part left out, it shows you when to come in. Each track has its own singer,
+and they are not all alike: young and older, every skin tone, some in glasses, some with a thick
+chain or with plugs in their ears, and now and then a grumpy one. If you would rather not see
+them, untick **Show the little singer** under your pieces.
 
 **Your director's breaths.** Where you have been told to breathe, or not to, mark it: open **Fix a
 note or a word**, click the note, and choose **Breathe here** or **No breath here** for what

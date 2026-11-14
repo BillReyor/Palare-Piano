@@ -313,3 +313,46 @@ def test_a_catch_breath_is_quick():
 def test_a_long_stretch_is_one_to_stagger_the_breathing_in():
     assert breath_at(12)[2] is True and breath_at(9.5)[2] is False and breath_at(26.5)[2] is False
     assert breath_at(3, [])[0] == 0 and js('breathAt(null, 3)', 'breathAt') == [0, None, False]
+
+
+# ---- a chorus is not made of one person: who each singer is
+# Asked for by a listener, as a truer picture of the chorus: some of the singers older, some with a thick chain or
+# with plugs or tunnels in stretched ear lobes, some of them grumpy.
+def look(pid, i):
+    return js(f'singerLook({json.dumps(pid)}, {i})', 'singerLook', 'singerTone', consts=['TONES', 'HAIRS'])
+
+
+def test_a_singers_look_says_who_they_are():
+    one = look('My Song', 0)
+    assert set(one) >= {'tone', 'old', 'chain', 'plug', 'grump', 'specs', 'hair', 'hairCol'}
+    assert one == look('My Song', 0)                               # and they stay who they are
+    assert one['tone'] == js('singerTone("My Song", 0)', 'singerTone', consts=['TONES'])
+
+
+@pytest.mark.parametrize('piece', ['My Song', 'Another', 'A Third One', 'The Fourth Piece'])
+def test_among_the_tracks_of_one_piece_there_is_some_of_everybody(piece):
+    five = [look(piece, i) for i in range(5)]                      # the five tracks made for one part
+    assert any(s['old'] for s in five) and not all(s['old'] for s in five)
+    assert any(s['chain'] for s in five) and not all(s['chain'] for s in five)
+    assert any(s['plug'] for s in five) and not all(s['plug'] for s in five)
+    assert 1 <= sum(1 for s in five if s['grump']) <= 2            # somebody is grumpy; most are not
+    assert len({json.dumps(s, sort_keys=True) for s in five}) == 5 # and no two of them are the same person
+
+
+def test_in_a_whole_chorus_set_the_mix_is_a_mix():
+    twenty = [look('My Song', i) for i in range(20)]               # five tracks for each of four parts
+    count = lambda k: sum(1 for s in twenty if s[k])
+    assert 6 <= count('old') <= 10 and 4 <= count('chain') <= 8 and 4 <= count('plug') <= 8 and 3 <= count('grump') <= 6
+    assert {s['plug'] for s in twenty} >= {0, 1, 2}                # plugs, and tunnels, and neither
+    assert {s['chain'] for s in twenty} >= {0, 1, 2}               # gold, and silver
+    assert all(s['hair'] == 2 for s in twenty if s['old']) or any(s['hair'] != 2 for s in twenty if s['old'])
+    assert any(s['hair'] == 1 for s in twenty) and any(s['hair'] == 0 for s in twenty)
+    assert any(s['specs'] for s in twenty) and not all(s['specs'] for s in twenty)
+
+
+def test_grey_hair_goes_with_age_and_any_colour_with_youth():
+    twenty = [look('Another', i) for i in range(20)]
+    for s in twenty:
+        if s['old'] and s['hair']:
+            r, g, b = s['hairCol']
+            assert abs(r - g) < .08 and abs(g - b) < .08 and r > .6    # grey or white
