@@ -171,3 +171,57 @@ def test_an_output_that_started_late_after_all_is_kept():
 def test_an_output_that_works_is_left_alone():
     got = sound_page('START = 30; click(); pass(3000); click(); pass(10000); return { outputs: outputs(), told: told(), painted: PAINTED };')
     assert got == {'outputs': [{'inClick': True, 'closed': False, 'state': 'running', 'notes': 2}], 'told': False, 'painted': 0}
+
+
+# ---- the little singer: what its mouth is doing at a moment of a track
+NOTES = [[1.0, 1.0, 'a'], [2.0, 1.0, 'e'], [3.0, 0.5, 'o'], [5.0, 2.0, 'm'], [8.0, 1.0, 'a']]      # [begins, lasts, mouth]
+
+
+def mouth_at(t, notes=NOTES):
+    return js(f'mouthAt({json.dumps(notes)}, {t})', 'mouthAt')
+
+
+def test_the_mouth_is_shut_before_the_first_note_between_phrases_and_after_the_last():
+    for t in (0, 0.9, 3.8, 4.5, 7.5, 9.5, 60):
+        assert mouth_at(t)[0] == 0, t
+    assert mouth_at(4)[1] is None                       # and it is no vowel's mouth then
+
+
+def test_the_mouth_opens_quickly_on_a_note_and_is_that_vowels():
+    opened, mouth, since = mouth_at(1.5)
+    assert opened == 1 and mouth == 'a' and since == pytest.approx(.5)
+    assert 0 < mouth_at(1.02)[0] < 1                    # opening: not a switch thrown
+    assert mouth_at(2.5)[1] == 'e' and mouth_at(3.2)[1] == 'o'
+
+
+def test_the_mouth_stays_open_from_one_note_to_the_next_and_closes_at_the_end_of_a_phrase():
+    assert mouth_at(1.98)[0] == 1                       # "la" runs straight into "see": no shutting between
+    assert 0 < mouth_at(3.46)[0] < 1                    # the last note before a rest: closing
+    assert mouth_at(3.49)[0] < mouth_at(3.44)[0]
+
+
+def test_a_hum_is_sung_with_the_lips_together():
+    opened, mouth, _ = mouth_at(6)
+    assert opened == 0 and mouth == 'm'
+
+
+def test_no_notes_no_mouth():
+    assert mouth_at(3, [])[0] == 0 and js('mouthAt(null, 3)', 'mouthAt')[0] == 0
+
+
+# ---- whose notes the singer sings beside a track
+SING = {'parts': {'T1': [[1, 1, 'a']], 'BR': [[1, 1, 'o']], 'BS': [[1, 1, 'e']]}, 'all': [[1, 1, 'a']], 'labels': {'Tenor 1': 'T1', 'Baritone': 'BR', 'Bass': 'BS'}}
+PIECE = {'read': {'parts': [['tenor1', 'Tenor 1'], ['baritone', 'Baritone'], ['bass', 'Bass']]}, 'made': {'part': 'baritone'}}
+
+
+@pytest.mark.parametrize('file, piece, part', [
+    ('My Song - Bass predominant.m4a', PIECE, 'BS'),                 # the part the track is named for,
+    ('Bass/My Song - Bass alone.mp3', PIECE, 'BS'),                  # (in a set made for the whole chorus)
+    ('My Song - Tenor 1 muted.m4a', PIECE, 'T1'),                    # ... also where it is left out: it shows when to sing
+    ('My Song - balanced.m4a', PIECE, 'BR'),                         # the part the tracks were made for,
+    ('My Song - voices only.m4a', dict(PIECE, made={'part': 'all'}), 'all'),      # or the whole choir
+    ('My Song - Alto predominant.m4a', PIECE, 'all'),                # a part nobody knows: whoever is singing
+    ('My Song - balanced.m4a', {}, 'all'),
+])
+def test_the_singer_sings_the_part_the_track_is_for(file, piece, part):
+    assert js(f'singerPart({json.dumps(file)}, {json.dumps(piece)}, {json.dumps(SING)})', 'singerPart') == part

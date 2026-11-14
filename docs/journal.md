@@ -2041,3 +2041,17 @@ What changed: the report now says which browser the page is open in and what sta
 was in - two days of guessing would have been one line - and the fixer has a "No sound?" beside
 its play button, which says the three things to look at. And a rule for the one doing this
 work: before explaining a fault in the page, find out which browser, and try it there.
+
+**A little singer.** The listener, as a wild card: a small three-dimensional chorus member who
+sings when a track plays, adorable and of no gender. It stands beside the track that is playing:
+a peg-doll figure in a robe the colour of the track, a white collar, a folder of music held in
+two round hands, two bright eyes. Its mouth is not driven by the sound. Routing a track through
+the page's own sound to measure its loudness would have put the page between the singer and
+their track - the one thing the last days showed must be left alone - and loudness knows nothing
+of vowels. The score knows both: when each part sings, and on what vowel. So the mouth opens
+with each note of the part, wide for "ah", spread for "ee", small and round for "oo", shut for
+a hum; the head lifts a little on each new note; on a long note the eyes close. Beside the track
+with a part left out it sings that part, which shows the singer at the computer when to come
+in. It was looked at as it was built - drawn in Safari's own engine, pose by pose, and
+photographed on the page - which is how the robe was found to end below the floor and the
+resting mouth to be a slit where a smile was meant.

@@ -84,6 +84,54 @@ def measure_starts(sc, clock):
     return [[round(float(np.interp(b0, clock[0], clock[1])), 2), int((sc.printed or {}).get(m, m))] for m, (b0, _) in order]
 
 
+OPEN, SPREAD, ROUND = 'AA AE AH AO AX AY AW LA'.split(), 'EH ER EY IH IY LE LI'.split(), 'OW OY UH UW LO LU'.split()
+
+
+def mouth(phonemes):
+    """The shape of a singer's mouth on a syllable (the engine's phonemes): 'a' wide open (ah), 'e' spread (ee, eh),
+    'o' round (oo, oh), 'm' lips together (a hum, or a drum syllable hummed on its consonant).  None for a note that
+    carries the syllable before it on."""
+    ph = phonemes if isinstance(phonemes, str) else ' '.join(phonemes)
+    if ph.strip() == '-':
+        return None
+    if '+' in ph:
+        return 'm'
+    for x in ph.split():
+        v = x.rstrip('012')
+        if v in OPEN or v in SPREAD or v in ROUND:
+            return 'a' if v in OPEN else 'e' if v in SPREAD else 'o'
+    return 'm'
+
+
+def singing(sc, clock):
+    """When each part sings, and with what mouth - for the little singer the page shows beside a track as it plays.
+    -> {'parts': {part: [[seconds, how long, mouth], ...]}, 'all': the same for the whole choir: whoever is singing,
+    the highest part first}.  It is taken from the score and the clock the voices were timed by, not from the sound:
+    the page then has no need to listen to its own tracks, and the mouth can make the vowel that is being sung."""
+    at = lambda beat: float(np.interp(float(beat), clock[0], clock[1]))
+    parts = {}
+    for part, notes in sc.parts.items():
+        out, last = [], 'a'
+        for n in engine_notes(sc, part) if notes else []:
+            a, b = at(n[0]), at(n[0] + n[1])
+            last = mouth(n[3]) or last
+            if out and n[3] == '-' and n[1] <= .25 and abs(out[-1][0] + out[-1][1] - a) < .02:        # the steps of a slide: one mouth, held
+                out[-1][1] = round(b - out[-1][0], 2)
+            elif b - a > .01:
+                out.append([round(a, 2), round(b - a, 2), last])
+        if out:
+            parts[part] = out
+    everyone = []                                  # the highest part's notes; where it rests, the next part's; and so on down
+    for part in [p for p in ('SOLO', 'T1', 'T2', 'BR', 'BS', 'TR1', 'TR2', 'TR3') if p in parts]:
+        for a, d, m in parts[part]:
+            pieces = [(a, a + d)]
+            for x, e, _ in everyone:
+                pieces = [q for s0, s1 in pieces for q in ((s0, min(s1, x)), (max(s0, x + e), s1)) if q[1] - q[0] > .05]
+            everyone += [[round(s0, 2), round(s1 - s0, 2), m] for s0, s1 in pieces]
+        everyone.sort()
+    return dict(parts=parts, all=everyone)
+
+
 def engine_notes(sc, part):
     """Score notes -> engine notes (beat, beats, midi, phonemes, dynamic), expanding slides.  A note that is spoken,
     not sung (an x-shaped notehead; "x" after its value in the score) has a sixth item, True."""

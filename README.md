@@ -172,6 +172,11 @@ To work on a hard passage, type its first and last measure after **Repeat measur
 **Repeat**: it plays over and over until you click **Stop repeating**. **Speed** plays any track
 slower, down to half speed, at the same pitch. Nothing has to be made again for either.
 
+A little singer stands beside the track that is playing and sings along: its mouth opens with
+each note of your part, in the shape of the vowel. On the track with your part left out, it shows
+you when to come in. If you would rather not see it, untick **Show the little singer** under
+your pieces.
+
 ![The finished tracks](docs/pictures/3-tracks.jpg)
 
 | Track | What you hear |

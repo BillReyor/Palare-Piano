@@ -298,3 +298,49 @@ def test_sing_keeps_a_stem_per_section(tmp_path, monkeypatch):
     t, m = pitch.yin(out['Bass alone'].mean(1), SR)
     v = m[(t > 1.1) & (t < 4.5)]
     assert np.nanmedian(v) < 52
+
+
+# ---- the little singer on the page: when each part sings, and with what mouth
+SUNG = '''title: x
+tempo: 60
+time: 4/4
+key: 0
+
+== 1
+TEN: c4/q=la d4/q=see e4/q=you r/q
+LOW: c3/h=bum r/h
+== 2
+TEN: c4/h=oh d4/h=_
+LOW: r/w
+'''
+
+
+def test_singing_says_when_a_part_sings_and_with_what_mouth():
+    # the page's little singer opens its mouth with the part it sings: wide for "ah", spread for "ee", round for "oo"
+    sc = scoremod.parse(SUNG, warn=lambda *a: None)
+    s = R.singing(sc, R.clock_for(sc))
+    assert s['parts']['T1'] == [[1.0, 1.0, 'a'], [2.0, 1.0, 'e'], [3.0, 1.0, 'o'], [5.0, 2.0, 'o'], [7.0, 2.0, 'o']]     # (a held note keeps its mouth)
+    assert s['parts']['T2'] == s['parts']['T1']
+    assert s['parts']['BS'] == [[1.0, 2.0, 'm']]                    # "bum", hummed on its m: lips together
+    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'}              # only the parts that sing at all
+
+
+def test_singing_of_everyone_is_whoever_is_singing_highest_part_first():
+    sc = scoremod.parse(SUNG.replace('LOW: r/w', 'LOW: c3/w=la').replace('TEN: c4/h=oh d4/h=_', 'TEN: r/h c4/h=oh'), warn=lambda *a: None)
+    s = R.singing(sc, R.clock_for(sc))
+    # measure 2: the basses sing "la" for four beats, the tenors rest two and then sing "oh"
+    assert s['all'][-2:] == [[5.0, 2.0, 'a'], [7.0, 2.0, 'o']]
+    assert s['all'][:3] == [[1.0, 1.0, 'a'], [2.0, 1.0, 'e'], [3.0, 1.0, 'o']]
+    assert all(b >= a and d > 0 for (a, d, _), (b, _, _) in zip(s['all'], s['all'][1:]))       # in order, never backwards
+
+
+@pytest.mark.parametrize('phonemes, mouth', [('l AA', 'a'), ('k AE t', 'a'), ('AY', 'a'), ('s IY', 'e'), ('b EH d', 'e'), ('ER', 'e'),
+                                             ('y UW', 'o'), ('OW', 'o'), ('g l LO', 'o'), ('s LA ng k', 'a'), ('k LI', 'e'), ('m', 'm'), ('n', 'm'), ('', 'm'), ('b AH + m', 'm'), ('-', None)])
+def test_mouth_of_a_syllable(phonemes, mouth):
+    assert R.mouth(phonemes) == mouth
+
+
+def test_singing_follows_the_tempo(tmp_path):
+    sc = scoremod.parse(SUNG.replace('tempo: 60', 'tempo: 120'), warn=lambda *a: None)
+    s = R.singing(sc, R.clock_for(sc))
+    assert s['parts']['T1'][:2] == [[1.0, 0.5, 'a'], [1.5, 0.5, 'e']]

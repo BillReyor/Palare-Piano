@@ -166,3 +166,12 @@ def test_end_to_end_no_part_writes_voices_and_balanced(tiny, tmp_path):
     for f in ('balanced', 'voices only'):
         x = read_wav(out / f'Tiny test - {f}.wav')
         assert len(x) / 44100 == pytest.approx(1. + 2. + 4., abs=.05)   # lead-in, 4 beats at 120, 4 s of tail
+
+
+def test_measures_flag_also_says_who_sings_when(demo_score):
+    r = run(demo_score, '--measures')
+    line = next(l for l in r.stdout.splitlines() if l.startswith('singing: '))
+    s = json.loads(line[len('singing: '):])
+    assert set(s['parts']) == {'T1', 'T2', 'BR', 'BS'} and s['all']
+    first = s['parts']['T1'][0]
+    assert first[2] == 'o' and first[0] == pytest.approx(1 + 3 * 60 / 66, abs=.02)        # "Oh", on the fourth beat

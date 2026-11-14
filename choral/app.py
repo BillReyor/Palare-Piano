@@ -658,6 +658,34 @@ def find_measures():
                 pass                                   # no harm done: the page simply does not show the measure for this one
 
 
+def singing(pid):
+    """What the page's little singer does with its mouth while a track of this piece plays: when each part sings,
+    and on what vowel (render.singing) - and which part each label on a track means.  Worked out from the score the
+    first time it is asked for and kept beside it; worked out again when the score has been changed.  {} where it
+    cannot be: the singer then simply stands and listens."""
+    try:
+        sf = score_of(pid)
+        kept, stamp = os.path.join(folder(pid), 'source', 'singing.json'), os.path.getmtime(sf)
+        try:
+            d = json.load(open(kept))
+            if d.get('stamp') == stamp:
+                return d['singing']
+        except (OSError, ValueError, KeyError):
+            pass
+        r = subprocess.run([PY, '-m', 'choral', sf, '--measures'], cwd=ROOT, capture_output=True, text=True, errors='replace',
+                           timeout=180, env=dict(os.environ, PYTHONUNBUFFERED='1'), **hidden())
+        line = next(l for l in r.stdout.splitlines() if l.startswith('singing: '))
+        s = json.loads(line[len('singing: '):])
+        key = {v: k for k, v in ASK.items()}                # 'bass' -> 'BS' ... ; where two parts sing one line, the one that has the notes
+        first = lambda ask: next((p for p in ((key[ask],) + (('BR',) if ask == 'bass' else ()) + (('T2',) if ask == 'tenor1' else ())) if p in s['parts']), None)
+        parts = (load(pid).get('read') or {}).get('parts') or what_was_read(pid)['parts']
+        s['labels'] = {x[1]: (('BR' if x[0] == 'bass' and len(x) > 2 and 'BR' in s['parts'] else None) or first(x[0])) for x in parts if first(x[0])}
+        json.dump(dict(stamp=stamp, singing=s), open(kept, 'w'))
+        return s
+    except Exception:
+        return {}
+
+
 def stop_now():
     p = now.get('proc')
     if p and p.poll() is None:
@@ -795,6 +823,8 @@ def act(path, q, body):
     if path == '/api/update':
         update_now()
         return {}
+    if path == '/api/singing':                         # the little singer beside a track: what its mouth does
+        return singing(pid)
     if path == '/api/setting':                         # the page's own switches
         if 'ding' in q:
             settings(ding=bool(q['ding']))

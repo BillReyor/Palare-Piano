@@ -163,6 +163,10 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.45 ui-monos
 .where-in .now[hidden] { display: none; }
 .where-in .now b { font-size: 19px; min-width: 1.6em; display: inline-block; text-align: center; white-space: nowrap; }
 .where-in .jump { margin-left: auto; }
+.track { position: relative; }
+.track.with-singer { padding-right: 118px; min-height: 140px; }
+.track canvas.singer { position: absolute; top: 6px; right: 8px; width: 104px; height: 128px; pointer-events: none; }
+@media (max-width: 520px) { .track.with-singer { padding-right: 0; min-height: 0; } .track canvas.singer { display: none; } }
 .where-in .jump.again { margin-left: 0; }
 .where-in .pace { margin-left: auto; }
 .where-in select { font: inherit; font-size: 15px; padding: 6px 8px; min-height: 38px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); }
@@ -206,7 +210,7 @@ footer .heart { color: var(--ink); }
   </section>
 
   <div id="pieces"></div>
-  <p class="small" id="dingrow" hidden><label><input type="checkbox" id="ding"> Play a sound when tracks are ready</label></p>
+  <p class="small" id="dingrow" hidden><label><input type="checkbox" id="ding"> Play a sound when tracks are ready</label> &nbsp; <label><input type="checkbox" id="singer"> Show the little singer beside a track as it plays</label></p>
   <div id="voices"></div>
   <div id="computer"></div>
 
@@ -261,6 +265,166 @@ function runs(ms) {                                 // [0, 1, 2, 3, 4, 7, 9] -> 
   return (ms.length === 1 ? 'measure ' : 'measures ') + (out.length > 1 ? out.slice(0, -1).join(', ') + ' and ' + out[out.length - 1] : out[0]);
 }
 function measureAt(p, t) { const tl = p.timeline || []; if (!tl.length) return null; let lo = 0, hi = tl.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (tl[mid][0] <= t + .05) lo = mid; else hi = mid - 1; } return tl[lo][1]; }
+// ---- The little singer.  Beside the track that is playing stands a small chorus member who sings it: the mouth opens
+// with each note of the part and takes the shape of its vowel - wide for "ah", spread for "ee", round for "oo", shut
+// for a hum.  What to sing comes from the score (/api/singing: when each part sings, and on what vowel), not from
+// listening to the track, so the track's own sound is left alone.
+// mouthAt: the mouth at a moment of a track -> [how far open (0 to 1), which mouth ('a' 'e' 'o' 'm', or null), seconds
+// since the note began].  notes: [[begins, lasts, mouth], ...] in order.
+function mouthAt(notes, t) {
+  if (!notes || !notes.length || t < notes[0][0]) return [0, null, 9];
+  let lo = 0, hi = notes.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (notes[mid][0] <= t) lo = mid; else hi = mid - 1; }
+  const n = notes[lo], since = t - n[0], left = n[0] + n[1] - t, next = notes[lo + 1];
+  if (left <= 0) return [0, null, since];
+  const on = next && next[0] - (n[0] + n[1]) < .06;            // the next note follows at once: the mouth does not shut between them
+  return [n[2] === 'm' ? 0 : Math.min(1, since / .07) * (on ? 1 : Math.min(1, left / .09)), n[2], since];
+}
+// Whose notes the singer sings beside a track: the part the track is named for (also where that part is left out - it
+// shows when to sing), else the part the tracks were made for, else whoever in the choir is singing.
+function singerPart(file, p, sing) {
+  const base = file.replace(/\.[^.]+$/, ''), name = base.slice(base.lastIndexOf(' - ') + 3), m = name.match(/^(.*) (predominant|muted|alone)$/i);
+  const label = m ? m[1] : (((p.read || {}).parts || []).find(x => x[0] === (p.made || {}).part) || [])[1];
+  const known = label && Object.keys(sing.labels || {}).find(l => l.toLowerCase() === label.toLowerCase()), key = known && sing.labels[known];
+  return key && sing.parts[key] ? key : 'all';
+}
+// The singer itself: one small figure for the whole page, drawn in three dimensions by a few lines given to the
+// computer's graphics chip (each point of the picture looks along a ray for the nearest of a handful of rounded
+// shapes: a robe, a head, a collar, two hands, a folder of music).  Nothing is downloaded for it.
+const SINGER_LOOK = `precision highp float;
+uniform vec2 uRes; uniform float uOpen, uWide, uTall, uBlink, uBounce, uSway, uBreath; uniform vec3 uTint;
+float smin(float a, float b, float k) { float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
+float ellipsoid(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.) / k1; }
+float roundCone(vec3 p, float r1, float r2, float h) { vec2 q = vec2(length(p.xz), p.y); float b = (r1 - r2) / h, a = sqrt(1. - b * b), k = dot(q, vec2(-b, a));
+  if (k < 0.) return length(q) - r1; if (k > a * h) return length(q - vec2(0., h)) - r2; return dot(q, vec2(a, b)) - r1; }
+float box(vec3 p, vec3 b, float r) { vec3 q = abs(p) - b; return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.) - r; }
+vec3 headAt() { return vec3(uSway * .10, .60 + uBounce * .035 + uBreath * .012, .02); }
+vec3 inHead(vec3 p) { vec3 q = p - headAt(); float a = -uSway * .22, c = cos(a), s = sin(a); return vec3(c * q.x - s * q.y, s * q.x + c * q.y, q.z); }
+vec3 mouthSize() { return vec3(.055 + .085 * uWide, .15 * uTall * uOpen, .2); }
+vec2 scene(vec3 p) {                                 // -> (distance to the nearest surface, which thing it is)
+  float robe = max(roundCone(p - vec3(0., -.98, 0.), .60 + uBreath * .012, .33, .98), -(p.y + .98));      // (it stands on the floor)
+  vec3 h = inHead(p);
+  float head = ellipsoid(h, vec3(.55, .51, .52));
+  if (mouthSize().y > .012) head = max(head, -ellipsoid(h - vec3(0., -.17, .50), mouthSize()));        // the mouth is hollowed out of it
+  float collar = length(vec2(length(p.xz) - .30, p.y - .08 - uBreath * .012)) - .085;
+  vec3 a = vec3(abs(p.x), p.y, p.z);
+  float hands = length(a - vec3(.37, -.36 + uBounce * .012, .50)) - .105;
+  vec3 f = p - vec3(0., -.40 + uBounce * .012, .53); float c = cos(.55), s = sin(.55); f = vec3(f.x, c * f.y - s * f.z, s * f.y + c * f.z);
+  float folder = box(f, vec3(.33, .21, .012), .012);
+  vec2 d = vec2(robe, 1.);
+  if (head < d.x) d = vec2(head, 2.);
+  d.x = smin(d.x, collar, .03); if (collar < robe && collar < head) d.y = 3.;
+  if (hands < d.x) d = vec2(hands, 4.);
+  if (folder < d.x) d = vec2(folder, 5.);
+  return d;
+}
+vec3 normalAt(vec3 p) { vec2 e = vec2(.002, 0.); return normalize(vec3(scene(p + e.xyy).x - scene(p - e.xyy).x, scene(p + e.yxy).x - scene(p - e.yxy).x, scene(p + e.yyx).x - scene(p - e.yyx).x)); }
+vec4 shade(vec2 px) {
+  vec2 uv = (px - .5 * uRes) / uRes.y;
+  vec3 ro = vec3(0., .08, 5.3), rd = normalize(vec3(uv.x, uv.y, -2.05));
+  float t = 3.6, hit = 0.; vec2 d;
+  for (int i = 0; i < 56; i++) { d = scene(ro + rd * t); if (d.x < .0012) { hit = 1.; break; } t += d.x; if (t > 8.2) break; }
+  if (hit < .5) {                                    // nothing there: only the figure's shadow on the floor
+    float tf = (-.99 - ro.y) / rd.y; vec3 g = ro + rd * tf;
+    float sh = rd.y < 0. ? smoothstep(.95, .15, length(vec2(g.x, g.z * .8))) * .22 : 0.;
+    return vec4(0., 0., 0., sh);
+  }
+  vec3 p = ro + rd * t, n = normalAt(p), h = inHead(p), col;
+  vec3 cream = vec3(1., .93, .84), robe = uTint;
+  if (d.y < 1.5) col = robe * (.82 + .18 * smoothstep(-.9, .1, p.y));
+  else if (d.y < 2.5) {
+    col = cream;
+    float inMouth = mouthSize().y > .012 ? ellipsoid(h - vec3(0., -.17, .50), mouthSize() + .012) : 1.;
+    if (inMouth < 0.) col = mix(vec3(.36, .10, .13), vec3(.86, .40, .44), smoothstep(-.30, -.22, h.y - .5 * (h.z - .40)));      // the dark of the mouth, a tongue below
+    else if (h.z > 0.) {
+      vec2 e = vec2(abs(h.x) - .19, h.y - .075);                                           // the eyes: dark, with a light in each
+      float eye = length(e / vec2(.062, .082));                                           // ... or shut, as a happy curve
+      float lid = smoothstep(.016, .008, abs(e.y - .012 + 4.5 * e.x * e.x)) * smoothstep(.07, .055, abs(e.x));
+      col = mix(col, vec3(.13, .10, .16), mix(smoothstep(1.05, .9, eye), lid, uBlink));
+      col = mix(col, vec3(1.), smoothstep(.028, .018, length(e - vec2(-.02 * sign(h.x) + .012, .03))) * (1. - uBlink));
+      col = mix(col, vec3(1., .62, .62), .55 * smoothstep(.13, .03, length(vec2(abs(h.x) - .33, h.y + .10))));      // cheeks
+      float shut = 1. - smoothstep(.012, .03, mouthSize().y);                               // a small smile while the mouth is shut
+      float line = abs(h.y + .195 - 2.2 * h.x * h.x);
+      col = mix(col, vec3(.42, .20, .22), shut * smoothstep(.017, .009, line) * smoothstep(.10, .08, abs(h.x)));
+    }
+  }
+  else if (d.y < 3.5) col = vec3(.98);
+  else if (d.y < 4.5) col = cream;
+  else col = vec3(.16, .14, .22);
+  vec3 l = normalize(vec3(-.45, .8, .65));
+  float dif = pow(.5 + .5 * dot(n, l), 1.6), ao = 1.;
+  for (int i = 1; i <= 4; i++) { float s = .06 * float(i); ao -= (s - scene(p + n * s).x) * .9 / float(i); }
+  float rim = pow(1. - max(dot(n, -rd), 0.), 3.);
+  vec3 lit = col * (.38 + .74 * dif) * clamp(ao, .45, 1.) + rim * .16 + pow(max(dot(reflect(rd, n), l), 0.), 28.) * .10;
+  return vec4(pow(clamp(lit, 0., 1.), vec3(.92)), 1.);
+}
+void main() {
+  vec4 c = vec4(0.);
+  for (int i = 0; i < 2; i++) for (int j = 0; j < 2; j++) { vec4 s = shade(gl_FragCoord.xy + (vec2(float(i), float(j)) - .5) * .5); c += vec4(s.rgb * s.a, s.a); }
+  gl_FragColor = c * .25;                            // (colour already multiplied by how solid it is, as the page expects)
+}`;
+const MOUTHS = { a: [.62, 1], e: [1, .5], o: [.2, .52], m: [.45, 0] };          // each vowel's mouth: how wide, how tall
+const singer = {
+  on: (() => { try { return localStorage.getItem('palare-singer') !== '0'; } catch (e) { return true; } })(),
+  still: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+  s: { open: 0, wide: .45, tall: 0, blink: 0, bounce: 0, sway: 0, breath: 0, lively: 0 }, tint: [.42, .18, .63], running: false,
+  make() {                                           // once: the picture, and the lines that draw it
+    if (this.canvas !== undefined) return this.gl;
+    const c = this.canvas = document.createElement('canvas'); c.className = 'singer'; c.setAttribute('aria-hidden', 'true');
+    const k = Math.min(2, window.devicePixelRatio || 1); c.width = Math.round(104 * k); c.height = Math.round(128 * k);
+    const gl = this.gl = c.getContext('webgl', { premultipliedAlpha: true, antialias: false });
+    if (!gl) return null;
+    const sh = (kind, src) => { const x = gl.createShader(kind); gl.shaderSource(x, src); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    try {
+      const pr = this.program = gl.createProgram();
+      gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main() { gl_Position = vec4(p, 0., 1.); }')); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, SINGER_LOOK)); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+      gl.useProgram(pr); gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.bindAttribLocation(pr, 0, 'p'); gl.vertexAttribPointer(gl.getAttribLocation(pr, 'p'), 2, gl.FLOAT, false, 0, 0);
+      this.at = {}; ['uRes', 'uOpen', 'uWide', 'uTall', 'uBlink', 'uBounce', 'uSway', 'uBreath', 'uTint'].forEach(u => { this.at[u] = gl.getUniformLocation(pr, u); });
+    } catch (e) { this.gl = null; this.why = String(e.message || e); }
+    return this.gl;
+  },
+  draw() {
+    const gl = this.gl, s = this.s, at = this.at; if (!gl) return;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height); gl.uniform2f(at.uRes, this.canvas.width, this.canvas.height);
+    gl.uniform1f(at.uOpen, s.open); gl.uniform1f(at.uWide, s.wide); gl.uniform1f(at.uTall, s.tall); gl.uniform1f(at.uBlink, s.blink);
+    gl.uniform1f(at.uBounce, s.bounce); gl.uniform1f(at.uSway, s.sway); gl.uniform1f(at.uBreath, s.breath); gl.uniform3f(at.uTint, this.tint[0], this.tint[1], this.tint[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+  step(dt, now) {                                    // one moment on: towards what the track is doing
+    const s = this.s, a = this.audio, playing = !!(a && !a.paused && !a.ended);
+    const [open, mouth, since] = playing && this.notes ? mouthAt(this.notes, a.currentTime + .05) : [0, null, 9];
+    const to = (x, y, secs) => x + (y - x) * (1 - Math.exp(-dt / secs)), m = MOUTHS[mouth] || [.45, s.tall];
+    s.open = to(s.open, open, open > s.open ? .035 : .06); s.wide = to(s.wide, m[0], .05); s.tall = to(s.tall, mouth ? m[1] : s.tall, .05);
+    if (mouth && since < this.since && !this.still) s.bounce = 1;                         // a new note: a little lift
+    this.since = mouth ? since : 9; s.bounce = to(s.bounce, 0, .16);
+    s.lively = to(s.lively, playing && mouth ? 1 : 0, playing && mouth ? .3 : .9);
+    s.sway = this.still ? 0 : Math.sin(now * 1.7) * .5 * s.lively; s.breath = this.still ? 0 : Math.sin(now * 1.1);
+    if (now > (this.blinkAt || 0)) { this.blinkAt = now + 2.5 + Math.random() * 3; this.blinkFrom = now; }
+    this.bliss = to(this.bliss || 0, mouth && mouth !== 'm' && since > 1.1 && open > .9 ? 1 : 0, .12);      // a long note: eyes shut, happily
+    s.blink = Math.max(now - (this.blinkFrom || -9) < .13 ? 1 : 0, this.bliss > .5 ? 1 : 0);
+    return playing || s.lively > .02 || s.open > .02 || s.blink > 0;
+  },
+  run() {
+    if (this.running || !this.gl) return; this.running = true; let last = performance.now();
+    const frame = t => { const busy = this.step(Math.min(.05, (t - last) / 1000), t / 1000); last = t; this.draw();
+      if (busy && this.on && this.canvas.isConnected) requestAnimationFrame(frame); else this.running = false; };
+    requestAnimationFrame(frame);
+  },
+  sing(node, audio, p, f, tint) {                    // a track has begun to play: stand beside it and sing its part
+    if (!this.on || !this.make()) return;
+    document.querySelectorAll('.track.with-singer').forEach(x => { if (x !== node) x.classList.remove('with-singer'); });
+    if (this.canvas.parentNode !== node) node.prepend(this.canvas); node.classList.add('with-singer');
+    const m = /^#(..)(..)(..)$/.exec(tint || ''); this.tint = m ? m.slice(1).map(x => parseInt(x, 16) / 255) : [.42, .18, .63];
+    this.audio = audio; this.notes = null; this.since = 9;
+    const use = sing => { if (this.audio === audio && sing && sing.parts) { const k = singerPart(f, p, sing); this.notes = k === 'all' ? sing.all : sing.parts[k]; } };
+    if (SING[p.id]) use(SING[p.id]); else post('/api/singing', { id: p.id }).then(j => { SING[p.id] = j; use(j); }).catch(() => {});
+    this.run();
+  },
+  show(on) { this.on = on; try { localStorage.setItem('palare-singer', on ? '1' : '0'); } catch (e) {} if (!on) { document.querySelectorAll('.track.with-singer').forEach(x => x.classList.remove('with-singer')); if (this.canvas) this.canvas.remove(); } },
+};
+const SING = {};                                     // piece -> what its singer sings: asked for when a track of it is first played
 // A passage to repeat: from the beginning of measure a to the end of measure b, in a track whose measures begin at
 // tl ([seconds, measure], in the order played).  -> { from, to } in seconds (to: null for the end of the track), or
 // { missing: n } for a measure the piece has not.  Given the wrong way round they are taken the right way; where a
@@ -334,7 +498,9 @@ const trackNode = (p, f, theirs) => {
     audio.addEventListener('ended', () => { if (loop) back(); });
     kids.push(el('div', { class: 'where-in' }, el('span', { class: 'jump again' }, el('label', null, 'Repeat measures ', from), el('label', null, 'to ', to), again), pace));
   } else kids.push(el('div', { class: 'where-in' }, pace));
-  return el('div', { class: 'track', style: w[1] ? '--tint:' + w[1] : null }, kids);
+  const node = el('div', { class: 'track', style: w[1] ? '--tint:' + w[1] : null }, kids);
+  audio.addEventListener('play', () => singer.sing(node, audio, p, f, w[1]));
+  return node;
 };
 const about = s => s < 90 ? 'about a minute' : 'about ' + Math.round(s / 60) + ' minutes';
 const partName = (r, v) => { const p = (r.parts || []).find(x => x[0] === v); return p ? p[1] : v; };
@@ -737,6 +903,7 @@ async function saveReport() {
   } catch (e) { alert(e.message); }
 }
 $('#report-go').onclick = saveReport;
+$('#singer').checked = singer.on; $('#singer').addEventListener('change', e => singer.show(e.target.checked));
 $('#ding').addEventListener('change', e => post('/api/setting', { ding: e.target.checked }).catch(() => {}));      // (switched on, the computer plays it once: that is what to listen for)
 $('#quit').onclick = () => { if (confirm('Quit Palare Piano? Anything being made is stopped; what was finished is kept.')) fetch('/api/quit', { method: 'POST', headers: { 'X-Palare': TOKEN } }).finally(() => { $('#gone').style.display = 'block'; }); };
 </script>

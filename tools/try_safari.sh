@@ -7,8 +7,8 @@
 # For a while every trial of the page was made in a browser of the other family, because that is what the tools at
 # hand could drive; two "fixes" to the fixer's sound were made that way, and neither was a fix.  This opens the real
 # page in a small window built on Safari's engine, with a copy of the program serving it from an empty library made
-# for the purpose, and does what a singer does: makes tracks for the demo piece, plays one, opens "Fix a note or a
-# word" and presses "Hear this measure" and "Hear this line".  It listens where the sound leaves the page - turned
+# for the purpose, and does what a singer does: makes tracks for the demo piece, plays one (and looks whether the
+# little singer beside it sings), opens "Fix a note or a word" and presses "Hear this measure" and "Hear this line".  It listens where the sound leaves the page - turned
 # down so far that the room hears nothing - and says whether the notes were there.
 #
 # What it cannot tell: whether a person hears them.  A muted tab, a muted computer, a setting of Safari itself are

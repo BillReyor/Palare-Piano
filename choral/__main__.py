@@ -150,6 +150,7 @@ def main():
         return
     if a.measures:                                 # (for tracks the page made before it kept this: see app.find_measures)
         log('measures: ' + json.dumps(R.measure_starts(sc, R.clock_for(sc))))
+        log('singing: ' + json.dumps(R.singing(sc, R.clock_for(sc)), separators=(',', ':')))      # (for the little singer on the page: app.singing)
         return
 
     # ---- the piece's preset: saved, or estimated from the score, then from whatever recordings there are

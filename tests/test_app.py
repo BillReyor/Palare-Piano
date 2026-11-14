@@ -669,3 +669,42 @@ def test_the_address_in_the_readme_is_where_the_page_is_first_looked_for():
     assert f'http://127.0.0.1:{app.PORTS[0]}' in readme
     assert app.PORTS[0] == 8765 and app.PORTS[-1] == 8789          # (and the others it may take, as the README says)
     assert str(app.PORTS[-1]) in readme
+
+
+# ---- the little singer: what its mouth does, for the page
+def test_the_singers_mouth_is_worked_out_from_the_score_and_kept(lib, monkeypatch):
+    pid = app.add('two lines.score', TWO_LINES)
+    with_tracks(lib, pid)
+    app.save(pid, read=app.what_was_read(pid))
+    got = app.act('/api/singing', {'id': pid}, None)
+    assert set(got['parts']) == {'T1', 'T2', 'BR', 'BS'} and got['all']
+    assert got['parts']['T1'][0] == [1.0, 0.6, 'a']                     # "la", a quarter note at 100 to the minute, after a second's silence
+    assert got['labels'] == {'Tenor 1': 'T1', 'Tenor 2': 'T2', 'Baritone': 'BR', 'Bass': 'BS'}
+    # the second time it is not worked out again
+    monkeypatch.setattr(app.subprocess, 'run', lambda *a, **k: pytest.fail('it was kept'))
+    assert app.act('/api/singing', {'id': pid}, None) == got
+
+
+def test_the_singers_mouth_is_worked_out_again_when_the_score_changes(lib):
+    import time
+    pid = app.add('two lines.score', TWO_LINES)
+    with_tracks(lib, pid)
+    app.save(pid, read=app.what_was_read(pid))
+    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1'][0][2] == 'a'
+    sf = app.score_of(pid)
+    open(sf, 'wb').write(TWO_LINES.replace(b'=la', b'=see'))
+    os.utime(sf, (time.time() + 5, time.time() + 5))
+    assert app.act('/api/singing', {'id': pid}, None)['parts']['T1'][0][2] == 'e'
+
+
+def test_parts_that_sing_one_line_share_a_singer(lib):
+    pid = app.add('one line.score', TWO_LINES.replace(b'c3+f3', b'c3').replace(b'a4+c5', b'a4'))
+    with_tracks(lib, pid)
+    app.save(pid, read=app.what_was_read(pid))
+    assert app.act('/api/singing', {'id': pid}, None)['labels'] == {'Tenor': 'T1', 'Bass': 'BR'}
+
+
+def test_a_piece_that_cannot_be_sung_has_no_singer_and_no_error(lib):
+    pid = app.add('broken.score', b'title: x\n== 1\nTEN: this is not music\n')
+    with_tracks(lib, pid)
+    assert app.act('/api/singing', {'id': pid}, None) == {}
