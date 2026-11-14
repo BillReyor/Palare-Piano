@@ -291,10 +291,31 @@ def computer():
         return None
 
 
-def report():
+def browser_name(agent):
+    """A browser, from what it says of itself to every page (its "user agent").  -> 'Safari 27.2', 'Chrome 156', ..."""
+    a = agent or ''
+    for mark, name in (('Edg/', 'Edge'), ('OPR/', 'Opera'), ('Firefox/', 'Firefox'), ('Chrome/', 'Chrome')):
+        m = re.search(re.escape(mark) + r'(\d+)', a)
+        if m:
+            return f'{name} {m.group(1)}'
+    m = re.search(r'Version/(\d+(?:\.\d+)?) .*Safari/', a)
+    if m:
+        return f'Safari {m.group(1)}'
+    return 'a browser built on Safari' if 'AppleWebKit' in a else 'not one it knows' if a.strip() else 'not told'
+
+
+SOUND_STATES = ('running', 'suspended', 'interrupted', 'closed', 'never used')
+
+
+def report(browser=None, sound=None):
     """What to send when something has not gone right: the version, the computer, and what the program noted about each
     piece.  Not the music: no score and no track is in it.  The reader's remarks name measures and parts, and here and
-    there a single word it stumbled over; the name of the home folder is taken out of every path.  -> the text"""
+    there a single word it stumbled over; the name of the home folder is taken out of every path.  -> the text
+
+    browser, sound: what the page says of the browser it is open in, and of the state of its own sound (the notes of
+    "Fix a note or a word").  Which browser it was is the first thing whoever reads a report about the page needs to
+    know, and nothing else here can tell them."""
+    browser = re.sub(r'[^ -~]+', ' ', str(browser))[:300].strip() if browser else None      # one line of plain characters, whatever was sent
     v, c, base = version() or {}, computer() or {}, os.path.dirname(ROOT)
     mc = c.get('machine') or {}
     out = [f'Palare Piano report, {time.strftime("%Y-%m-%d %H:%M")}', '',
@@ -304,6 +325,7 @@ def report():
            + (f'; {c.get("slow")} times as slow as the reference; {c.get("at_once")} voices sung at once' if c else '; the check has not run'),
            *[f'           {r["what"]}: {r["level"]} {r.get("time") or ""} {r.get("why") or ""}'.rstrip() for r in c.get('rows', [])],
            f'voices:    real voices {"added" if voices_state()["ready"] else "not added"}',
+           'browser:   ' + browser_name(browser) + (f'  ({browser})' if browser else '') + (f"; the page's own sound: {sound}" if sound in SOUND_STATES else ''),
            f'updates:   {newer["count"]} newer; {("could not ask: " + newer["error"]) if newer["error"] else "asked"}']
     said = lambda title, lines: [f'  --- {title}:'] + [f'      {l}' for l in lines] if lines else []
     for d in pieces():
@@ -779,7 +801,7 @@ def act(path, q, body):
                 ding()                                 # switched on: played once, so that it is known what to listen for
         return {}
     if path == '/api/report':
-        return dict(name=f'Palare Piano report {time.strftime("%Y-%m-%d %H%M")}.txt', text=report())
+        return dict(name=f'Palare Piano report {time.strftime("%Y-%m-%d %H%M")}.txt', text=report(q.get('browser'), q.get('sound')))
     if path == '/api/check':
         if not checking['running']:
             checking.update(running=True)

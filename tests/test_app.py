@@ -250,6 +250,51 @@ def test_report_has_no_music_and_no_home_folder(lib, monkeypatch):
     assert home not in text
 
 
+# ---- the report says which browser the page is open in
+# (two days went on guessing at a browser's behaviour without knowing which browser it was)
+SAFARI = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15'
+CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36'
+
+
+@pytest.mark.parametrize('agent, name', [
+    (SAFARI, 'Safari 27.2'),
+    (CHROME, 'Chrome 156'),
+    (CHROME + ' Edg/156.0.0.0', 'Edge 156'),
+    ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0', 'Firefox 150'),
+    ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)', 'a browser built on Safari'),
+    ('something else entirely', 'not one it knows'),
+    ('', 'not told'), (None, 'not told'),
+])
+def test_a_browser_is_known_by_what_it_says_of_itself(agent, name):
+    assert app.browser_name(agent) == name
+
+
+def test_report_names_the_browser_and_what_its_sound_was_doing(lib, monkeypatch):
+    monkeypatch.setattr(app, 'version', lambda: None)
+    monkeypatch.setattr(app, 'computer', lambda: None)
+    monkeypatch.setattr(app, 'voices_state', lambda: {'ready': False})
+    text = app.report(browser=SAFARI, sound='suspended')
+    line = next(ln for ln in text.splitlines() if ln.startswith('browser:'))
+    assert 'Safari 27.2' in line and 'Version/27.2 Safari/605.1.15' in line and 'the page\'s own sound: suspended' in line
+    assert 'browser:   not told' in app.report()
+
+
+def test_what_the_page_says_of_its_browser_cannot_add_lines_to_the_report(lib, monkeypatch):
+    monkeypatch.setattr(app, 'version', lambda: None)
+    monkeypatch.setattr(app, 'computer', lambda: None)
+    monkeypatch.setattr(app, 'voices_state', lambda: {'ready': False})
+    got = app.act('/api/report', {'browser': 'Nice/1.0\nversion:   forged\n' + 'x' * 2000, 'sound': 'running\n== a piece that is not there'}, None)
+    lines = got['text'].splitlines()
+    assert not any(ln.startswith(('version:   forged', '== a piece')) for ln in lines)
+    browser = next(ln for ln in lines if ln.startswith('browser:'))
+    assert len(browser) < 400 and 'the page\'s own sound' not in browser      # a state it never heard of is left out
+
+
+def test_the_fixer_offers_help_when_nothing_is_heard():
+    html = open(os.path.join(os.path.dirname(app.__file__), 'app.html'), encoding='utf-8').read()
+    assert 'No sound?' in html and 'the tab is muted' in html                   # the one thing the page cannot see for itself
+
+
 # ---- the server answers only this computer, and works only for its own page
 
 def test_page_is_served_with_its_token(server):

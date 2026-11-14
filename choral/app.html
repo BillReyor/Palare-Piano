@@ -522,7 +522,12 @@ function paintFixer(pid) {
     el('div', { class: 'fixnav' },
       el('span', { class: 'where' }, el('button', { disabled: m.prev == null, onclick: () => goMeasure(pid, m.prev), 'aria-label': 'Previous measure' }, '◀'), 'Measure', num, el('button', { disabled: m.next == null, onclick: () => goMeasure(pid, m.next), 'aria-label': 'Next measure' }, '▶')),
       el('span', { class: 'where' }, 'or find', word, el('button', { onclick: find }, 'Find')),
-      el('button', { onclick: e => hear(pid, m, m.staves, e.currentTarget) }, '▶ Hear this measure')),
+      el('button', { onclick: e => hear(pid, m, m.staves, e.currentTarget) }, '▶ Hear this measure'),
+      el('button', { class: 'quiet', 'aria-expanded': f.silent ? 'true' : 'false', onclick: () => { f.silent = !f.silent; paintFixer(pid); } }, 'No sound?')),
+    f.silent ? el('div', { class: 'note' }, el('b', null, 'If you hear nothing when you press play here:'), el('ol', { style: 'margin:6px 0 0 20px;padding:0' },
+      el('li', null, 'Look at this page\'s tab at the top of the browser window. A speaker with a line through it means the tab is muted: click the speaker, and try again.'),
+      el('li', null, 'Turn up the computer\'s volume. These notes are quieter than the tracks.'),
+      el('li', null, 'Still nothing? Click ', el('b', null, 'Save a report'), ' at the bottom of this page and send it. It says which browser this is, which is what whoever reads it needs to know.'))) : null,
     f.found ? el('p', { class: 'small' }, '“' + f.found.text + '” is sung in measure' + (f.found.at.length > 1 ? 's ' : ' '), f.found.at.map((n, i) => [i ? ', ' : '', n === m.n ? el('b', null, n) : el('button', { class: 'quiet', onclick: () => { const keepFound = f.found; goMeasure(pid, n).then(() => { f.found = keepFound; paintFixer(pid); }); } }, n)]), '.') : null,
     f.msg ? el('p', { class: 'note bad', role: 'alert' }, f.msg) : null,
     reviewBox(pid)];
@@ -726,7 +731,7 @@ window.addEventListener('dragover', e => e.preventDefault()); window.addEventLis
 // "Save a report": the text comes from the program and is saved the way a browser saves any download
 async function saveReport() {
   try {
-    const j = await post('/api/report'), url = URL.createObjectURL(new Blob([j.text], { type: 'text/plain' }));
+    const j = await post('/api/report', { browser: navigator.userAgent, sound: AC ? AC.state : 'never used' }), url = URL.createObjectURL(new Blob([j.text], { type: 'text/plain' }));
     const a = el('a', { href: url, download: j.name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
     $('#reported').hidden = false;
   } catch (e) { alert(e.message); }

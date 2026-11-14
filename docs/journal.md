@@ -2019,3 +2019,25 @@ tests now, with its slow start, its never starting, and its rule about clicks: w
 does with each was written down before the page was changed. The lesson is an old one. A guard
 against a fault nobody has seen can only be tried against the faults its author imagines, and
 here the author imagined the wrong ones; the plain version had worked.
+
+**Wrong twice, and why.** The play buttons were still silent after the cure above. The
+listener added one thing: a little speaker shows on the browser's tab for about a second. So
+the browser was making sound - and none was heard. Then, at last, the things that should have
+been looked at first: the copy was the newest; nothing was being made; the sound went to the
+computer's own speakers, at ordinary volume; and the page opens in Safari. Every trial of the
+page until then had been in a browser of the other family, because that is what the tools at
+hand drive.
+
+A window was built on Safari's own engine, in which a script's press counts as a person's
+click, and the page's sound was listened to where it leaves the page. The real page: a track
+plays; "Hear this measure" makes its output at the click, asleep, and it is running thirty
+thousandths of a second later; 169 of 202 blocks of sound carry the notes, at the strength they
+should have. Both explanations given so far - a computer busy making tracks, an output slow to
+start - were wrong for this computer. The page does its part in this engine. What is left is
+between the browser and the ear, where the page cannot see: a tab that has been muted shows a
+speaker and plays nothing. That is a question for the listener, not a finding.
+
+What changed: the report now says which browser the page is open in and what state its sound
+was in - two days of guessing would have been one line - and the fixer has a "No sound?" beside
+its play button, which says the three things to look at. And a rule for the one doing this
+work: before explaining a fault in the page, find out which browser, and try it there.
